@@ -1,0 +1,30 @@
+import express from "express";
+import dotenv from "dotenv";
+import mongoose from 'mongoose';
+
+import userRoute from "./routes/user.route.js"
+
+const app = express()
+dotenv.config()
+
+const port = process.env.PORT;
+const MONOGO_URL=process.env.MONGO_URI;
+// console.log(MONOGO_URL);
+
+//middleware
+app.use(express.json());
+
+
+try {
+    mongoose.connect(MONOGO_URL);
+    console.log("Connected to MongoDB");
+} catch (error) {
+    console.log(error);
+}
+
+//defining routes
+app.use("/api/users", userRoute);
+
+app.listen(port, () => {
+  console.log(`Example app listening on port ${port}`)
+})
