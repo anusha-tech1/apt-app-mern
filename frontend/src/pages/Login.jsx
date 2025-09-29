@@ -35,7 +35,7 @@ const Login = ({ onSwitchToRegister }) => {
         headers: {
           'Content-Type': 'application/json',
         },
-        credentials: 'include', // Important for cookies
+        credentials: 'include',
         body: JSON.stringify(formData),
       });
 
@@ -45,13 +45,9 @@ const Login = ({ onSwitchToRegister }) => {
         throw new Error(data.message || 'Login failed');
       }
 
-      // Store user data
       localStorage.setItem('user', JSON.stringify(data.user));
-      
-      // Show success message
       alert(`Login successful! Welcome ${data.user.name}`);
       
-      // Redirect based on role
       switch(data.user.role) {
         case 'admin':
           window.location.href = '/admin-dashboard';
@@ -84,25 +80,65 @@ const Login = ({ onSwitchToRegister }) => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-      <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8">
-        <div className="text-center mb-8">
-          <div className="mx-auto h-12 w-12 bg-indigo-600 rounded-full flex items-center justify-center mb-4">
-            <Shield className="h-6 w-6 text-white" />
+    <div style={{
+      minHeight: '100vh',
+      background: 'linear-gradient(135deg, #ebf4ff 0%, #e0e7ff 100%)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '1rem'
+    }}>
+      <div style={{
+        maxWidth: '28rem',
+        width: '100%',
+        background: 'white',
+        borderRadius: '1rem',
+        boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)',
+        padding: '2rem'
+      }}>
+        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+          <div style={{
+            margin: '0 auto',
+            height: '3rem',
+            width: '3rem',
+            background: '#4f46e5',
+            borderRadius: '9999px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginBottom: '1rem'
+          }}>
+            <Shield style={{ height: '1.5rem', width: '1.5rem', color: 'white' }} />
           </div>
-          <h2 className="text-3xl font-bold text-gray-900">Welcome Back</h2>
-          <p className="text-gray-600 mt-2">Sign in to your account</p>
+          <h2 style={{ fontSize: '1.875rem', fontWeight: 'bold', color: '#1f2937' }}>
+            Welcome Back
+          </h2>
+          <p style={{ color: '#6b7280', marginTop: '0.5rem' }}>
+            Sign in to your account
+          </p>
         </div>
 
         {error && (
-          <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
-            <p className="text-red-600 text-sm">{error}</p>
+          <div style={{
+            marginBottom: '1rem',
+            padding: '1rem',
+            background: '#fef2f2',
+            border: '1px solid #fecaca',
+            borderRadius: '0.5rem'
+          }}>
+            <p style={{ color: '#dc2626', fontSize: '0.875rem' }}>{error}</p>
           </div>
         )}
 
-        <div className="space-y-6">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label style={{
+              display: 'block',
+              fontSize: '0.875rem',
+              fontWeight: '500',
+              color: '#374151',
+              marginBottom: '0.5rem'
+            }}>
               Email Address
             </label>
             <input
@@ -111,33 +147,63 @@ const Login = ({ onSwitchToRegister }) => {
               value={formData.email}
               onChange={handleChange}
               onKeyPress={handleKeyPress}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors outline-none"
+              style={{
+                width: '100%',
+                padding: '0.75rem 1rem',
+                border: '1px solid #d1d5db',
+                borderRadius: '0.5rem',
+                outline: 'none'
+              }}
               placeholder="Enter your email"
               required
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label style={{
+              display: 'block',
+              fontSize: '0.875rem',
+              fontWeight: '500',
+              color: '#374151',
+              marginBottom: '0.5rem'
+            }}>
               Password
             </label>
-            <div className="relative">
+            <div style={{ position: 'relative' }}>
               <input
                 name="password"
                 type={showPassword ? "text" : "password"}
                 value={formData.password}
                 onChange={handleChange}
                 onKeyPress={handleKeyPress}
-                className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors outline-none"
+                style={{
+                  width: '100%',
+                  padding: '0.75rem 3rem 0.75rem 1rem',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '0.5rem',
+                  outline: 'none'
+                }}
                 placeholder="Enter your password"
                 required
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute inset-y-0 right-0 px-3 flex items-center text-gray-400 hover:text-gray-600 transition-colors"
+                style={{
+                  position: 'absolute',
+                  top: '0',
+                  right: '0',
+                  padding: '0 0.75rem',
+                  height: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  color: '#9ca3af',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer'
+                }}
               >
-                {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                {showPassword ? <EyeOff style={{ height: '1.25rem', width: '1.25rem' }} /> : <Eye style={{ height: '1.25rem', width: '1.25rem' }} />}
               </button>
             </div>
           </div>
@@ -145,18 +211,34 @@ const Login = ({ onSwitchToRegister }) => {
           <button
             onClick={handleSubmit}
             disabled={loading}
-            className="w-full bg-indigo-600 text-white py-3 px-4 rounded-lg hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+            style={{
+              width: '100%',
+              background: '#4f46e5',
+              color: 'white',
+              padding: '0.75rem 1rem',
+              borderRadius: '0.5rem',
+              border: 'none',
+              fontWeight: '500',
+              cursor: loading ? 'not-allowed' : 'pointer',
+              opacity: loading ? 0.5 : 1
+            }}
           >
             {loading ? 'Signing In...' : 'Sign In'}
           </button>
         </div>
 
-        <div className="mt-6 text-center">
-          <p className="text-gray-600">
+        <div style={{ marginTop: '1.5rem', textAlign: 'center' }}>
+          <p style={{ color: '#6b7280' }}>
             Don't have an account?{' '}
             <button
               onClick={() => navigate('/register')}
-              className="text-indigo-600 hover:text-indigo-500 font-medium transition-colors"
+              style={{
+                color: '#4f46e5',
+                background: 'none',
+                border: 'none',
+                fontWeight: '500',
+                cursor: 'pointer'
+              }}
             >
               Sign up
             </button>
