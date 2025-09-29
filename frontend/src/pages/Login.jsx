@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Shield, Eye, EyeOff } from 'lucide-react';
 
 const Login = ({ onSwitchToRegister }) => {
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     email: '',
     password: ''
@@ -153,7 +155,7 @@ const Login = ({ onSwitchToRegister }) => {
           <p className="text-gray-600">
             Don't have an account?{' '}
             <button
-              onClick={onSwitchToRegister}
+              onClick={() => navigate('/register')}
               className="text-indigo-600 hover:text-indigo-500 font-medium transition-colors"
             >
               Sign up

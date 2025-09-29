@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 const Register = ({ onSwitchToLogin }) => {
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -259,7 +261,7 @@ const Register = ({ onSwitchToLogin }) => {
           <p style={{ color: '#6B7280', margin: 0 }}>
             Already have an account?{' '}
             <button
-              onClick={onSwitchToLogin}
+              onClick={() => navigate('/login')}
               style={{ color: '#059669', background: 'none', border: 'none', cursor: 'pointer', fontWeight: '500', textDecoration: 'underline' }}
             >
               Sign in

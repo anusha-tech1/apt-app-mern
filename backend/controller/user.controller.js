@@ -4,7 +4,7 @@ import createTokenAndSaveCookies from "../jwt/AuthToken.js";
 
 export const register = async (req, res) => {
   try {
-    const { email, name, password, role } = req.body;
+    const { email, name, password, role, permissions } = req.body;
 
     if (!email || !name || !password || !role) {
       return res.status(400).json({ message: "Please fill all required fields" });
@@ -16,7 +16,14 @@ export const register = async (req, res) => {
     }
 
     // No need to hash manually, pre('save') will handle it
-    const newUser = new User({ email, name, password, role });
+    const newUser = new User({
+      email,
+      name,
+      password,
+      role,
+      // Only apply permissions if provided (primarily for committee members/admins). Defaults handled by schema
+      ...(Array.isArray(permissions) ? { permissions } : {}),
+    });
     await newUser.save();
 
     // Generate token
@@ -64,9 +71,36 @@ export const login = async (req, res) => {
 // Logout user
 export const logout = async (req, res) => {
   try {
-    res.cookie("jwt", "", { maxAge: 0 });
+    // Ensure we clear the same cookie that we set in AuthToken.js (name: "token")
+    res.cookie("token", "", { maxAge: 0 });
     res.status(200).json({ message: "Logged out successfully" });
   } catch (error) {
     res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Update user's permissions (e.g., by Admin)
+export const updatePermissions = async (req, res) => {
+  try {
+    const { email, permissions } = req.body;
+    if (!email || !Array.isArray(permissions)) {
+      return res.status(400).json({ message: "Email and permissions array are required" });
+    }
+
+    const user = await User.findOneAndUpdate(
+      { email },
+      { $set: { permissions } },
+      { new: true }
+    );
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const { password: _, ...userData } = user.toObject();
+    return res.status(200).json({ message: "Permissions updated", user: userData });
+  } catch (error) {
+    console.error("Update permissions error:", error);
+    return res.status(500).json({ message: "Server error" });
   }
 };

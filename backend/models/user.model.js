@@ -25,6 +25,12 @@ const userSchema = new mongoose.Schema({
         },
         default: "resident"
     },
+    // Optional granular permissions primarily for committee members (but can be used for others)
+    // Example values: 'member_management', 'announcements', 'reports'
+    permissions: {
+        type: [String],
+        default: [],
+    },
     password: {
         type: String,
         required: [true, "Password is required"],

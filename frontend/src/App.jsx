@@ -1,86 +1,94 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import AdminDashboard from './pages/AdminDashboard';
+import CommitteeDashboard from './pages/CommitteeDashboard';
+import ResidentDashboard from './pages/ResidentDashboard';
+import StaffDashboard from './pages/StaffDashboard';
+import Unauthorized from './pages/Unauthorized';
 
-const App = () => {
-  const [isLogin, setIsLogin] = useState(true);
-  const [user, setUser] = useState(null);
-
-  // Check if user is already logged in on app start
-  useEffect(() => {
-    const savedUser = localStorage.getItem('user');
-    if (savedUser) {
-      try {
-        const userData = JSON.parse(savedUser);
-        setUser(userData);
-        // Optionally redirect to dashboard based on role
-        // redirectToDashboard(userData.role);
-      } catch (error) {
-        console.error('Error parsing saved user data:', error);
-        localStorage.removeItem('user');
-      }
-    }
-  }, []);
-
-  // Function to redirect to dashboard based on role
-  const redirectToDashboard = (role) => {
-    switch(role) {
-      case 'admin':
-        window.location.href = '/admin-dashboard';
-        break;
-      case 'committee_member':
-        window.location.href = '/committee-dashboard';
-        break;
-      case 'staff':
-        window.location.href = '/staff-dashboard';
-        break;
-      case 'resident':
-        window.location.href = '/resident-dashboard';
-        break;
-      default:
-        window.location.href = '/dashboard';
-    }
-  };
-
-  // If user is already logged in, show a dashboard or redirect
-  if (user) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 text-center">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">Welcome back, {user.name}!</h2>
-          <p className="text-gray-600 mb-6">Role: {user.role.replace('_', ' ').toUpperCase()}</p>
-          <div className="space-y-4">
-            <button
-              onClick={() => redirectToDashboard(user.role)}
-              className="w-full bg-indigo-600 text-white py-3 px-4 rounded-lg hover:bg-indigo-700 transition-colors font-medium"
-            >
-              Go to Dashboard
-            </button>
-            <button
-              onClick={() => {
-                localStorage.removeItem('user');
-                setUser(null);
-              }}
-              className="w-full bg-gray-300 text-gray-700 py-3 px-4 rounded-lg hover:bg-gray-400 transition-colors font-medium"
-            >
-              Logout
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Show login or register based on state
-  return (
-    <div className="App">
-      {isLogin ? (
-        <Login onSwitchToRegister={() => setIsLogin(false)} />
-      ) : (
-        <Register onSwitchToLogin={() => setIsLogin(true)} />
-      )}
-    </div>
-  );
+const getCurrentUser = () => {
+  const saved = localStorage.getItem('user');
+  if (!saved) return null;
+  try { return JSON.parse(saved); } catch { return null; }
 };
 
-export default App;
+const RoleRedirect = () => {
+  const user = getCurrentUser();
+  if (!user) return <Navigate to="/login" replace />;
+  switch (user.role) {
+    case 'admin':
+      return <Navigate to="/admin-dashboard" replace />;
+    case 'committee_member':
+      return <Navigate to="/committee-dashboard" replace />;
+    case 'staff':
+      return <Navigate to="/staff-dashboard" replace />;
+    case 'resident':
+      return <Navigate to="/resident-dashboard" replace />;
+    default:
+      return <Navigate to="/unauthorized" replace />;
+  }
+};
+
+const ProtectedRoute = ({ children, allowed }) => {
+  const location = useLocation();
+  const user = getCurrentUser();
+  if (!user) {
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+  if (allowed && !allowed.includes(user.role)) {
+    return <Navigate to="/unauthorized" replace />;
+  }
+  return children;
+};
+
+export default function App() {
+  return (
+    <Routes>
+      <Route path="/" element={<RoleRedirect />} />
+
+      <Route path="/login" element={<Login />} />
+      <Route path="/register" element={<Register />} />
+
+      <Route
+        path="/admin-dashboard"
+        element={
+          <ProtectedRoute allowed={["admin"]}>
+            <AdminDashboard />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/committee-dashboard"
+        element={
+          <ProtectedRoute allowed={["admin", "committee_member"]}>
+            <CommitteeDashboard />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/resident-dashboard"
+        element={
+          <ProtectedRoute allowed={["resident", "admin", "committee_member"]}>
+            <ResidentDashboard />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/staff-dashboard"
+        element={
+          <ProtectedRoute allowed={["staff", "admin"]}>
+            <StaffDashboard />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route path="/unauthorized" element={<Unauthorized />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  );
+}
