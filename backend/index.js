@@ -4,6 +4,7 @@ import mongoose from 'mongoose';
 import cookieParser from 'cookie-parser';
 
 import userRoute from "./routes/user.route.js"
+import analyticsRoute from "./routes/analytics.route.js"
 
 const app = express()
 dotenv.config()
@@ -26,6 +27,7 @@ try {
 
 //defining routes
 app.use("/api/users", userRoute);
+app.use("/api/analytics", analyticsRoute);
 
 app.listen(port, () => {
   console.log(`Example app listening on port ${port}`)

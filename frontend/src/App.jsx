@@ -7,6 +7,7 @@ import CommitteeDashboard from './pages/CommitteeDashboard';
 import ResidentDashboard from './pages/ResidentDashboard';
 import StaffDashboard from './pages/StaffDashboard';
 import Unauthorized from './pages/Unauthorized';
+import AnalyticsDashboard from './pages/AnalyticsDashboard';
 
 const getCurrentUser = () => {
   const saved = localStorage.getItem('user');
@@ -83,6 +84,15 @@ export default function App() {
         element={
           <ProtectedRoute allowed={["staff", "admin"]}>
             <StaffDashboard />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/analytics"
+        element={
+          <ProtectedRoute allowed={["admin"]}>
+            <AnalyticsDashboard />
           </ProtectedRoute>
         }
       />
