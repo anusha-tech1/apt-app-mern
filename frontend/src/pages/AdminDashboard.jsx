@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Users, DollarSign, FileText, Wrench, Calendar, 
@@ -1170,17 +1170,6 @@ const AdminDashboard = () => {
     );
   };
 
-  const PlaceholderContent = ({ title, description }) => (
-    <div className="content-section">
-      <h2>{title}</h2>
-      <div className="placeholder-content">
-        <MessageSquare size={48} style={{ color: '#9ca3af' }} />
-        <p>{description}</p>
-        <p className="text-muted">This module is under development</p>
-      </div>
-    </div>
-  );
-
   const AmenitiesContent = () => {
     const [amenitiesView, setAmenitiesView] = useState('overview');
     const [amenities, setAmenities] = useState([]);
@@ -2180,6 +2169,863 @@ const AdminDashboard = () => {
       </div>
     );
   };
+
+  const DocumentsContent = () => {
+    const [documentsView, setDocumentsView] = useState('overview');
+    const [documents, setDocuments] = useState([]);
+    const [documentStats, setDocumentStats] = useState(null);
+    const [loadingDocs, setLoadingDocs] = useState(false);
+    const [selectedDocument, setSelectedDocument] = useState(null);
+    const [filters, setFilters] = useState({ category: 'all', accessLevel: 'all', search: '' });
+    
+    const [uploadForm, setUploadForm] = useState({
+      title: '',
+      description: '',
+      category: 'Bylaws',
+      accessLevel: 'residents_only',
+      tags: '',
+      expiryDate: '',
+      file: null
+    });
+
+    const fileInputRef = useRef(null);
+
+    const documentCategories = [
+      'Bylaws',
+      'Circulars',
+      'Agreements',
+      'Meeting Minutes',
+      'Financial Reports',
+      'Notice',
+      'Other'
+    ];
+
+    const accessLevels = [
+      { value: 'public', label: 'Public', color: '#10b981' },
+      { value: 'residents_only', label: 'Residents Only', color: '#3b82f6' },
+      { value: 'committee_only', label: 'Committee Only', color: '#f59e0b' },
+      { value: 'admin_only', label: 'Admin Only', color: '#ef4444' }
+    ];
+
+    useEffect(() => {
+      if (activeTab === 'documents') {
+        fetchDocuments();
+        fetchDocumentStats();
+      }
+    }, [activeTab, filters]);
+
+    const fetchDocuments = async () => {
+      setLoadingDocs(true);
+      try {
+        const queryParams = new URLSearchParams();
+        if (filters.category !== 'all') queryParams.append('category', filters.category);
+        if (filters.accessLevel !== 'all') queryParams.append('accessLevel', filters.accessLevel);
+        if (filters.search) queryParams.append('search', filters.search);
+
+        const res = await fetch(`/api/documents?${queryParams}`, { credentials: 'include' });
+        const data = await res.json();
+        
+        if (res.ok) {
+          setDocuments(data.documents || []);
+        } else {
+          setUiMessage({ type: 'error', message: data.message || 'Failed to fetch documents' });
+        }
+      } catch (err) {
+        setUiMessage({ type: 'error', message: 'Failed to fetch documents' });
+      } finally {
+        setLoadingDocs(false);
+      }
+    };
+
+    const fetchDocumentStats = async () => {
+      try {
+        const res = await fetch('/api/documents/stats', { credentials: 'include' });
+        const data = await res.json();
+        
+        if (res.ok) {
+          setDocumentStats(data.stats || null);
+        }
+      } catch (err) {
+        console.error('Failed to fetch document stats');
+      }
+    };
+
+    const handleFileChange = (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        if (file.size > 10 * 1024 * 1024) {
+          setUiMessage({ type: 'error', message: 'File size must be less than 10MB' });
+          e.target.value = '';
+          return;
+        }
+        setUploadForm({ ...uploadForm, file });
+      }
+    };
+
+    const handleUploadDocument = async (e) => {
+      e.preventDefault();
+      
+      if (!uploadForm.file) {
+        setUiMessage({ type: 'error', message: 'Please select a file to upload' });
+        return;
+      }
+
+      setUiMessage({ type: 'loading', message: 'Uploading document...' });
+
+      try {
+        const formData = new FormData();
+        formData.append('file', uploadForm.file);
+        formData.append('title', uploadForm.title);
+        formData.append('description', uploadForm.description);
+        formData.append('category', uploadForm.category);
+        formData.append('accessLevel', uploadForm.accessLevel);
+        formData.append('tags', uploadForm.tags);
+        if (uploadForm.expiryDate) formData.append('expiryDate', uploadForm.expiryDate);
+
+        const res = await fetch('/api/documents', {
+          method: 'POST',
+          credentials: 'include',
+          body: formData
+        });
+
+        const data = await res.json();
+        
+        if (!res.ok) throw new Error(data.message || 'Failed to upload document');
+        
+        setUiMessage({ type: 'success', message: 'Document uploaded successfully' });
+        setUploadForm({
+          title: '',
+          description: '',
+          category: 'Bylaws',
+          accessLevel: 'residents_only',
+          tags: '',
+          expiryDate: '',
+          file: null
+        });
+        
+        // Clear input using ref BEFORE changing view
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+        
+        setDocumentsView('overview');
+        fetchDocuments();
+        fetchDocumentStats();
+      } catch (err) {
+        setUiMessage({ type: 'error', message: err.message });
+      }
+    };
+
+    const handleUpdateDocument = async (documentId, updates) => {
+      try {
+        const res = await fetch(`/api/documents/${documentId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(updates)
+        });
+
+        const data = await res.json();
+        
+        if (!res.ok) throw new Error(data.message || 'Failed to update document');
+        
+        setUiMessage({ type: 'success', message: 'Document updated successfully' });
+        fetchDocuments();
+        setSelectedDocument(null);
+      } catch (err) {
+        setUiMessage({ type: 'error', message: err.message });
+      }
+    };
+
+    const handleDeleteDocument = async (documentId) => {
+      if (!confirm('Are you sure you want to delete this document? This action cannot be undone.')) return;
+      
+      try {
+        const res = await fetch(`/api/documents/${documentId}`, {
+          method: 'DELETE',
+          credentials: 'include'
+        });
+
+        const data = await res.json();
+        
+        if (!res.ok) throw new Error(data.message || 'Failed to delete document');
+        
+        setUiMessage({ type: 'success', message: 'Document deleted successfully' });
+        fetchDocuments();
+        fetchDocumentStats();
+      } catch (err) {
+        setUiMessage({ type: 'error', message: err.message });
+      }
+    };
+
+    const handleDownloadDocument = async (documentId, fileName) => {
+      try {
+        const res = await fetch(`/api/documents/${documentId}/download`, {
+          credentials: 'include'
+        });
+
+        if (!res.ok) throw new Error('Failed to download document');
+
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        
+        setUiMessage({ type: 'success', message: 'Document downloaded successfully' });
+        fetchDocuments(); // Refresh to update download count
+      } catch (err) {
+        setUiMessage({ type: 'error', message: err.message });
+      }
+    };
+
+    const formatFileSize = (bytes) => {
+      if (bytes === 0) return '0 Bytes';
+      const k = 1024;
+      const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+    };
+
+    const getFileIcon = (fileType) => {
+      if (fileType.includes('pdf')) return '📄';
+      if (fileType.includes('word') || fileType.includes('doc')) return '📝';
+      if (fileType.includes('excel') || fileType.includes('sheet')) return '📊';
+      if (fileType.includes('powerpoint') || fileType.includes('presentation')) return '📽️';
+      if (fileType.includes('image')) return '🖼️';
+      return '📎';
+    };
+
+    const getAccessLevelColor = (level) => {
+      return accessLevels.find(a => a.value === level)?.color || '#6b7280';
+    };
+
+    const totalDocuments = documentStats?.totalDocuments || 0;
+    const totalDownloads = documentStats?.totalDownloads || 0;
+    const categoryBreakdown = documentStats?.documentsByCategory || [];
+    const recentUploads = documentStats?.recentUploads || [];
+
+    return (
+      <div className="content-section">
+        <div className="section-header">
+          <h2>Document Repository</h2>
+          <div style={{ display: 'flex', gap: 12 }}>
+            <button className="secondary-btn" onClick={() => setDocumentsView('upload')}>
+              <FolderOpen size={18} />
+              Upload Document
+            </button>
+          </div>
+        </div>
+
+        {uiMessage && documentsView === 'overview' && (
+          <div className={`message ${uiMessage.type}`}>
+            {uiMessage.message}
+          </div>
+        )}
+
+        {loadingDocs ? (
+          <div className="loading">Loading documents...</div>
+        ) : documentsView === 'overview' ? (
+          <>
+            <div className="stats-grid" style={{ marginBottom: 32 }}>
+              <div className="stat-card">
+                <div className="stat-icon" style={{ backgroundColor: '#3b82f615' }}>
+                  <FolderOpen size={24} style={{ color: '#3b82f6' }} />
+                </div>
+                <div className="stat-content">
+                  <div className="stat-title">Total Documents</div>
+                  <div className="stat-value">{totalDocuments}</div>
+                  <div className="stat-change positive">Active documents</div>
+                </div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-icon" style={{ backgroundColor: '#10b98115' }}>
+                  <FileText size={24} style={{ color: '#10b981' }} />
+                </div>
+                <div className="stat-content">
+                  <div className="stat-title">Total Downloads</div>
+                  <div className="stat-value">{totalDownloads}</div>
+                  <div className="stat-change positive">All time</div>
+                </div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-icon" style={{ backgroundColor: '#f59e0b15' }}>
+                  <Calendar size={24} style={{ color: '#f59e0b' }} />
+                </div>
+                <div className="stat-content">
+                  <div className="stat-title">Categories</div>
+                  <div className="stat-value">{categoryBreakdown.length}</div>
+                  <div className="stat-change positive">Document types</div>
+                </div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-icon" style={{ backgroundColor: '#8b5cf615' }}>
+                  <Bell size={24} style={{ color: '#8b5cf6' }} />
+                </div>
+                <div className="stat-content">
+                  <div className="stat-title">Recent Uploads</div>
+                  <div className="stat-value">{recentUploads.length}</div>
+                  <div className="stat-change positive">Last 5 uploads</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Filters */}
+            <div style={{ 
+              background: 'white', 
+              padding: '20px', 
+              borderRadius: '12px', 
+              marginBottom: '24px',
+              display: 'flex',
+              gap: '16px',
+              flexWrap: 'wrap',
+              alignItems: 'flex-end'
+            }}>
+              <div className="form-group" style={{ minWidth: '200px', marginBottom: 0 }}>
+                <label>Search Documents</label>
+                <input
+                  type="text"
+                  value={filters.search}
+                  onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+                  placeholder="Search by title, tags..."
+                  style={{ padding: '8px 12px' }}
+                />
+              </div>
+              <div className="form-group" style={{ minWidth: '180px', marginBottom: 0 }}>
+                <label>Category</label>
+                <select
+                  value={filters.category}
+                  onChange={(e) => setFilters({ ...filters, category: e.target.value })}
+                  style={{ padding: '8px 12px' }}
+                >
+                  <option value="all">All Categories</option>
+                  {documentCategories.map(cat => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-group" style={{ minWidth: '180px', marginBottom: 0 }}>
+                <label>Access Level</label>
+                <select
+                  value={filters.accessLevel}
+                  onChange={(e) => setFilters({ ...filters, accessLevel: e.target.value })}
+                  style={{ padding: '8px 12px' }}
+                >
+                  <option value="all">All Levels</option>
+                  {accessLevels.map(level => (
+                    <option key={level.value} value={level.value}>{level.label}</option>
+                  ))}
+                </select>
+              </div>
+              <button 
+                onClick={fetchDocuments} 
+                className="secondary-btn"
+                style={{ marginBottom: 0 }}
+              >
+                Apply Filters
+              </button>
+            </div>
+
+            {/* Documents Grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '20px' }}>
+              {documents.length === 0 ? (
+                <div style={{ 
+                  gridColumn: '1 / -1',
+                  textAlign: 'center', 
+                  padding: '60px 20px', 
+                  background: 'white',
+                  borderRadius: '12px',
+                  color: '#94a3b8' 
+                }}>
+                  <FolderOpen size={48} style={{ marginBottom: '16px' }} />
+                  <h3 style={{ margin: '0 0 8px 0', color: '#374151' }}>No documents found</h3>
+                  <p>Upload your first document to get started</p>
+                </div>
+              ) : (
+                documents.map(doc => (
+                  <div
+                    key={doc._id}
+                    style={{
+                      background: 'white',
+                      borderRadius: '12px',
+                      padding: '20px',
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                      transition: 'all 0.2s',
+                      cursor: 'pointer',
+                      border: '1px solid #e2e8f0'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = 'translateY(-4px)';
+                      e.currentTarget.style.boxShadow = '0 8px 16px rgba(0,0,0,0.1)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+                      <div style={{ fontSize: '32px' }}>{getFileIcon(doc.fileType)}</div>
+                      <span 
+                        className="status-badge"
+                        style={{ 
+                          backgroundColor: `${getAccessLevelColor(doc.accessLevel)}15`,
+                          color: getAccessLevelColor(doc.accessLevel),
+                          fontSize: '11px',
+                          padding: '4px 8px'
+                        }}
+                      >
+                        {accessLevels.find(a => a.value === doc.accessLevel)?.label}
+                      </span>
+                    </div>
+
+                    <h4 style={{ margin: '0 0 8px 0', fontSize: '16px', color: '#0f172a' }}>
+                      {doc.title}
+                    </h4>
+
+                    {doc.description && (
+                      <p style={{ 
+                        fontSize: '13px', 
+                        color: '#64748b', 
+                        margin: '0 0 12px 0',
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden'
+                      }}>
+                        {doc.description}
+                      </p>
+                    )}
+
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '12px' }}>
+                      <span style={{ 
+                        padding: '4px 8px', 
+                        background: '#f3f4f6', 
+                        borderRadius: '4px', 
+                        fontSize: '11px',
+                        color: '#6b7280'
+                      }}>
+                        {doc.category}
+                      </span>
+                      <span style={{ 
+                        padding: '4px 8px', 
+                        background: '#f3f4f6', 
+                        borderRadius: '4px', 
+                        fontSize: '11px',
+                        color: '#6b7280'
+                      }}>
+                        {formatFileSize(doc.fileSize)}
+                      </span>
+                    </div>
+
+                    {doc.tags && doc.tags.length > 0 && (
+                      <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginBottom: '12px' }}>
+                        {doc.tags.slice(0, 3).map((tag, idx) => (
+                          <span
+                            key={idx}
+                            style={{
+                              padding: '2px 6px',
+                              background: '#dbeafe',
+                              color: '#1e40af',
+                              borderRadius: '3px',
+                              fontSize: '10px'
+                            }}
+                          >
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    <div style={{ 
+                      borderTop: '1px solid #f1f5f9',
+                      paddingTop: '12px',
+                      marginTop: '12px',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center'
+                    }}>
+                      <div style={{ fontSize: '12px', color: '#94a3b8' }}>
+                        <div>{doc.uploaderName}</div>
+                        <div>{new Date(doc.createdAt).toLocaleDateString('en-IN')}</div>
+                      </div>
+                      <div style={{ fontSize: '11px', color: '#94a3b8' }}>
+                        {doc.downloadCount} downloads
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '6px', marginTop: '12px' }}>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDownloadDocument(doc._id, doc.fileName);
+                        }}
+                        className="btn-save"
+                        style={{ flex: 1, fontSize: '12px', justifyContent: 'center' }}
+                      >
+                        Download
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedDocument(doc);
+                        }}
+                        className="btn-toggle"
+                        style={{ fontSize: '12px', padding: '6px 12px' }}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteDocument(doc._id);
+                        }}
+                        className="btn-delete"
+                        style={{ fontSize: '12px', padding: '6px 12px' }}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Edit Document Modal */}
+            {selectedDocument && (
+              <div 
+                style={{
+                  position: 'fixed',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  background: 'rgba(0,0,0,0.5)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  zIndex: 1000,
+                  padding: '20px'
+                }}
+                onClick={() => setSelectedDocument(null)}
+              >
+                <div 
+                  style={{
+                    background: 'white',
+                    borderRadius: '12px',
+                    width: '100%',
+                    maxWidth: '600px',
+                    maxHeight: '90vh',
+                    overflow: 'auto'
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div style={{ 
+                    padding: '24px',
+                    borderBottom: '1px solid #e2e8f0',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                  }}>
+                    <h3 style={{ margin: 0 }}>Edit Document</h3>
+                    <button
+                      onClick={() => setSelectedDocument(null)}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        fontSize: '24px',
+                        cursor: 'pointer',
+                        color: '#6b7280'
+                      }}
+                    >
+                      ×
+                    </button>
+                  </div>
+                  <div style={{ padding: '24px' }}>
+                    <div className="form-group">
+                      <label>Title</label>
+                      <input
+                        value={selectedDocument.title}
+                        onChange={(e) => setSelectedDocument({ ...selectedDocument, title: e.target.value })}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Description</label>
+                      <textarea
+                        value={selectedDocument.description || ''}
+                        onChange={(e) => setSelectedDocument({ ...selectedDocument, description: e.target.value })}
+                        rows="3"
+                        style={{ 
+                          padding: '10px 14px',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: '8px',
+                          fontSize: '14px',
+                          fontFamily: 'inherit',
+                          resize: 'vertical',
+                          width: '100%'
+                        }}
+                      />
+                    </div>
+                    <div className="form-grid">
+                      <div className="form-group">
+                        <label>Category</label>
+                        <select
+                          value={selectedDocument.category}
+                          onChange={(e) => setSelectedDocument({ ...selectedDocument, category: e.target.value })}
+                        >
+                          {documentCategories.map(cat => (
+                            <option key={cat} value={cat}>{cat}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="form-group">
+                        <label>Access Level</label>
+                        <select
+                          value={selectedDocument.accessLevel}
+                          onChange={(e) => setSelectedDocument({ ...selectedDocument, accessLevel: e.target.value })}
+                        >
+                          {accessLevels.map(level => (
+                            <option key={level.value} value={level.value}>{level.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                    <div className="form-group">
+                      <label>Tags (comma-separated)</label>
+                      <input
+                        value={selectedDocument.tags?.join(', ') || ''}
+                        onChange={(e) => setSelectedDocument({ 
+                          ...selectedDocument, 
+                          tags: e.target.value.split(',').map(t => t.trim()).filter(t => t)
+                        })}
+                        placeholder="e.g., important, 2024, budget"
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Expiry Date (Optional)</label>
+                      <input
+                        type="date"
+                        value={selectedDocument.expiryDate ? new Date(selectedDocument.expiryDate).toISOString().split('T')[0] : ''}
+                        onChange={(e) => setSelectedDocument({ ...selectedDocument, expiryDate: e.target.value })}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <input
+                          type="checkbox"
+                          checked={selectedDocument.isActive}
+                          onChange={(e) => setSelectedDocument({ ...selectedDocument, isActive: e.target.checked })}
+                        />
+                        Active Document
+                      </label>
+                    </div>
+                    <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
+                      <button
+                        onClick={() => handleUpdateDocument(selectedDocument._id, {
+                          title: selectedDocument.title,
+                          description: selectedDocument.description,
+                          category: selectedDocument.category,
+                          accessLevel: selectedDocument.accessLevel,
+                          tags: selectedDocument.tags?.join(','),
+                          expiryDate: selectedDocument.expiryDate,
+                          isActive: selectedDocument.isActive
+                        })}
+                        className="primary-btn"
+                        style={{ flex: 1, justifyContent: 'center' }}
+                      >
+                        Save Changes
+                      </button>
+                      <button
+                        onClick={() => setSelectedDocument(null)}
+                        className="secondary-btn"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </>
+        ) : (
+          // Upload Form
+          <div className="form-card">
+            <div className="section-header" style={{ marginBottom: 24 }}>
+              <h3 style={{ margin: 0 }}>Upload New Document</h3>
+              <button className="secondary-btn" onClick={() => setDocumentsView('overview')}>
+                Back to Documents
+              </button>
+            </div>
+
+            {uiMessage && (
+              <div className={`message ${uiMessage.type}`}>
+                {uiMessage.message}
+              </div>
+            )}
+
+            <form onSubmit={handleUploadDocument}>
+              <div style={{ background: '#f8fafc', padding: '24px', borderRadius: '12px', marginBottom: '24px' }}>
+                <h4 style={{ marginBottom: '16px', color: '#1e293b' }}>Document Information</h4>
+                <div className="form-grid">
+                  <div className="form-group">
+                    <label>Document Title *</label>
+                    <input
+                      value={uploadForm.title}
+                      onChange={(e) => setUploadForm({ ...uploadForm, title: e.target.value })}
+                      placeholder="e.g., Society Bylaws 2024"
+                      required
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Category *</label>
+                    <select
+                      value={uploadForm.category}
+                      onChange={(e) => setUploadForm({ ...uploadForm, category: e.target.value })}
+                      required
+                    >
+                      {documentCategories.map(cat => (
+                        <option key={cat} value={cat}>{cat}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label>Description</label>
+                  <textarea
+                    value={uploadForm.description}
+                    onChange={(e) => setUploadForm({ ...uploadForm, description: e.target.value })}
+                    placeholder="Brief description of the document"
+                    rows="3"
+                    style={{ 
+                      padding: '10px 14px',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      fontFamily: 'inherit',
+                      resize: 'vertical',
+                      width: '100%'
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ background: '#f8fafc', padding: '24px', borderRadius: '12px', marginBottom: '24px' }}>
+                <h4 style={{ marginBottom: '16px', color: '#1e293b' }}>File Upload</h4>
+                <div className="form-group">
+                  <label>Select File * (Max 10MB)</label>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    onChange={handleFileChange}
+                    accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.jpg,.jpeg,.png"
+                    required
+                    style={{
+                      padding: '10px',
+                      border: '2px dashed #e2e8f0',
+                      borderRadius: '8px',
+                      width: '100%',
+                      cursor: 'pointer'
+                    }}
+                  />
+                  <small style={{ fontSize: '12px', color: '#64748b', marginTop: '4px', display: 'block' }}>
+                    Supported formats: PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX, TXT, JPG, PNG
+                  </small>
+                </div>
+                {uploadForm.file && (
+                  <div style={{ 
+                    marginTop: '12px', 
+                    padding: '12px', 
+                    background: 'white', 
+                    borderRadius: '6px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px'
+                  }}>
+                    <span style={{ fontSize: '24px' }}>{getFileIcon(uploadForm.file.type)}</span>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: '14px', fontWeight: 500, color: '#0f172a' }}>
+                        {uploadForm.file.name}
+                      </div>
+                      <div style={{ fontSize: '12px', color: '#64748b' }}>
+                        {formatFileSize(uploadForm.file.size)}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div style={{ background: '#f8fafc', padding: '24px', borderRadius: '12px', marginBottom: '24px' }}>
+                <h4 style={{ marginBottom: '16px', color: '#1e293b' }}>Access & Settings</h4>
+                <div className="form-grid">
+                  <div className="form-group">
+                    <label>Access Level *</label>
+                    <select
+                      value={uploadForm.accessLevel}
+                      onChange={(e) => setUploadForm({ ...uploadForm, accessLevel: e.target.value })}
+                      required
+                    >
+                      {accessLevels.map(level => (
+                        <option key={level.value} value={level.value}>{level.label}</option>
+                      ))}
+                    </select>
+                    <small style={{ fontSize: '12px', color: '#64748b', marginTop: '4px', display: 'block' }}>
+                      Controls who can view and download this document
+                    </small>
+                  </div>
+                  <div className="form-group">
+                    <label>Expiry Date (Optional)</label>
+                    <input
+                      type="date"
+                      value={uploadForm.expiryDate}
+                      onChange={(e) => setUploadForm({ ...uploadForm, expiryDate: e.target.value })}
+                      min={new Date().toISOString().split('T')[0]}
+                    />
+                    <small style={{ fontSize: '12px', color: '#64748b', marginTop: '4px', display: 'block' }}>
+                      Document will be marked as expired after this date
+                    </small>
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label>Tags (comma-separated)</label>
+                  <input
+                    value={uploadForm.tags}
+                    onChange={(e) => setUploadForm({ ...uploadForm, tags: e.target.value })}
+                    placeholder="e.g., important, 2024, budget, annual"
+                  />
+                  <small style={{ fontSize: '12px', color: '#64748b', marginTop: '4px', display: 'block' }}>
+                    Add tags to help with searching and organization
+                  </small>
+                </div>
+              </div>
+
+              <button 
+                type="submit" 
+                className="primary-btn" 
+                style={{ width: '100%', justifyContent: 'center' }}
+              >
+                Upload Document
+              </button>
+            </form>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const PlaceholderContent = ({ title, description }) => (
+    <div className="content-section">
+      <h2>{title}</h2>
+      <div className="placeholder-content">
+        <MessageSquare size={48} style={{ color: '#9ca3af' }} />
+        <p>{description}</p>
+        <p className="text-muted">This module is under development</p>
+      </div>
+    </div>
+  );
+
   return (
     <>
       <style>{`
@@ -2250,9 +3096,10 @@ const AdminDashboard = () => {
         
         .main-content {
           margin-left: 260px;
+          width: calc(100% - 260px);
           min-height: 100vh;
           background: #f8fafc;
-          padding: 32px;
+          padding: 64px 32px 32px 32px;
         }
         
         .content-section { max-width: 1400px; margin: 0 auto; }
@@ -2680,7 +3527,7 @@ const AdminDashboard = () => {
           {activeTab === 'announcements' && (
             <PlaceholderContent title="Announcements" description="Create and manage community announcements" />
           )}
-          {activeTab === 'documents' && <PlaceholderContent title="Document Repository" description="Store and manage important documents" />}
+          {activeTab === 'documents' && <DocumentsContent />}
           {activeTab === 'staff' && <PlaceholderContent title="Staff & Vendors" description="Manage staff attendance and vendor information" />}
           {activeTab === 'security' && <PlaceholderContent title="Security Management" description="Monitor visitor logs and security activities" />}
         </div>

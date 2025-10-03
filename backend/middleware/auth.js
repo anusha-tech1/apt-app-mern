@@ -5,16 +5,28 @@ import { User } from "../models/user.model.js";
 export const verifyToken = async (req, res, next) => {
   try {
     const token = req.cookies?.token || req.header("Authorization")?.replace("Bearer ", "");
-    if (!token) return res.status(401).json({ message: "Authentication required" });
+    
+    if (!token) {
+      return res.status(401).json({ message: "Authentication required" });
+    }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET_KEY);
-    req.user = decoded; // { id, role }
-
-    // Ensure user still exists and is active
-    const user = await User.findById(decoded.id);
+    
+    // Fetch the full user details from database
+    const user = await User.findById(decoded.id).select('name email role isActive');
+    
     if (!user || !user.isActive) {
       return res.status(401).json({ message: "User not active or not found" });
     }
+
+    // Set the full user object in req.user
+    req.user = {
+      _id: user._id,
+      id: user._id.toString(),
+      name: user.name,
+      email: user.email,
+      role: user.role
+    };
 
     next();
   } catch (err) {
