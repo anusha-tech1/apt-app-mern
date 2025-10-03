@@ -1,3 +1,4 @@
+// Updated ResidentDashboard.jsx
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -11,15 +12,38 @@ const Card = ({ title, children }) => (
 function ResidentDashboard() {
   const navigate = useNavigate();
   const [uiMessage, setUiMessage] = useState(null);
+  const [bookingMessage, setBookingMessage] = useState(null); // New: Local message for booking section
   const [form, setForm] = useState({ title: '', description: '', category: 'Other', priority: 'medium' });
   const [myComplaints, setMyComplaints] = useState([]);
   const [documents, setDocuments] = useState([]);
+  const [amenities, setAmenities] = useState([]);
+  const [myBookings, setMyBookings] = useState([]);
   const [loading, setLoading] = useState(false);
   const [loadingDocs, setLoadingDocs] = useState(false);
+  const [loadingAmenities, setLoadingAmenities] = useState(false);
+  const [loadingBookings, setLoadingBookings] = useState(false);
   const [page, setPage] = useState(1);
   const [limit] = useState(5);
   const [total, setTotal] = useState(0);
   const [filters, setFilters] = useState({ category: 'all', search: '' });
+  const [selectedAmenity, setSelectedAmenity] = useState(null);
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [availableSlots, setAvailableSlots] = useState([]);
+  const [bookingForm, setBookingForm] = useState({
+    amenityId: '',
+    bookingDate: '',
+    startTime: '',
+    endTime: '',
+    purpose: '',
+    numberOfGuests: 1
+  });
+  const [user, setUser] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('user') || '{}');
+    } catch {
+      return {};
+    }
+  });
   const categories = ['Plumbing','Electrical','Carpentry','Cleaning','Security','Parking','Elevator','Common Area','Noise','Other'];
   const priorities = ['low','medium','high','urgent'];
   const documentCategories = [
@@ -35,7 +59,9 @@ function ResidentDashboard() {
   useEffect(() => { 
     fetchMyComplaints(); 
     fetchDocuments();
-  }, [page, filters]);
+    fetchAmenities();
+    fetchMyBookings();
+  }, [page, filters, user._id]);
 
   const fetchMyComplaints = async () => {
     setLoading(true);
@@ -75,6 +101,114 @@ function ResidentDashboard() {
       setUiMessage({ type: 'error', message: 'Failed to fetch documents' });
     } finally {
       setLoadingDocs(false);
+    }
+  };
+
+  const fetchAmenities = async () => {
+    setLoadingAmenities(true);
+    try {
+      const res = await fetch('/api/amenities/amenities?status=active', { credentials: 'include' });
+      const data = await res.json();
+      if (res.ok) {
+        setAmenities(data.amenities || []);
+      } else {
+        setBookingMessage({ type: 'error', message: data.message || 'Failed to fetch amenities' }); // Use bookingMessage for amenity errors
+      }
+    } catch (err) {
+      setBookingMessage({ type: 'error', message: 'Failed to fetch amenities' });
+    } finally {
+      setLoadingAmenities(false);
+    }
+  };
+
+  const fetchMyBookings = async () => {
+    setLoadingBookings(true);
+    try {
+      if (!user._id) {
+        setBookingMessage({ type: 'error', message: 'User not authenticated' });
+        return;
+      }
+      const res = await fetch(`/api/amenities/bookings?userId=${user._id}`, { credentials: 'include' });
+      const data = await res.json();
+      if (res.ok) {
+        setMyBookings(data.bookings || []);
+      } else {
+        setBookingMessage({ type: 'error', message: data.message || 'Failed to fetch bookings' });
+      }
+    } catch (err) {
+      setBookingMessage({ type: 'error', message: 'Failed to fetch bookings' });
+    } finally {
+      setLoadingBookings(false);
+    }
+  };
+
+  const fetchAvailableSlots = async (amenityId, date) => {
+    try {
+      const res = await fetch(`/api/amenities/bookings/available-slots?amenityId=${amenityId}&date=${date}`, { credentials: 'include' });
+      const data = await res.json();
+      if (res.ok) {
+        setAvailableSlots(data.availableSlots || []);
+      } else {
+        setBookingMessage({ type: 'error', message: data.message || 'Failed to fetch slots' });
+      }
+    } catch (err) {
+      setBookingMessage({ type: 'error', message: 'Failed to fetch available slots' });
+    }
+  };
+
+  const handleAmenitySelect = (amenity) => {
+    setSelectedAmenity(amenity);
+    const newDate = selectedDate;
+    setBookingForm({ ...bookingForm, amenityId: amenity._id, bookingDate: newDate });
+    setBookingMessage(null); // Clear message on new selection
+    fetchAvailableSlots(amenity._id, newDate);
+  };
+
+  const handleDateChange = (e) => {
+    const newDate = e.target.value;
+    setSelectedDate(newDate);
+    setBookingForm({ ...bookingForm, bookingDate: newDate });
+    setBookingMessage(null); // Clear message on date change
+    if (selectedAmenity) {
+      fetchAvailableSlots(selectedAmenity._id, newDate);
+    }
+  };
+
+  const handleSlotSelect = (slot) => {
+    setBookingForm({ ...bookingForm, startTime: slot.startTime, endTime: slot.endTime });
+    setBookingMessage(null); // Clear message on slot select
+  };
+
+  const handleBookingSubmit = async (e) => {
+    e.preventDefault();
+    if (!user._id) {
+      setBookingMessage({ type: 'error', message: 'User not authenticated' });
+      return;
+    }
+    setBookingMessage({ type: 'loading', message: 'Creating booking...' });
+    try {
+      const res = await fetch('/api/amenities/bookings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(bookingForm)
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Failed to create booking');
+      setBookingMessage({ type: 'success', message: 'Booking created successfully' });
+      setBookingForm({
+        amenityId: '',
+        bookingDate: '',
+        startTime: '',
+        endTime: '',
+        purpose: '',
+        numberOfGuests: 1
+      });
+      setSelectedAmenity(null);
+      setAvailableSlots([]);
+      fetchMyBookings();
+    } catch (err) {
+      setBookingMessage({ type: 'error', message: err.message });
     }
   };
 
@@ -145,6 +279,7 @@ function ResidentDashboard() {
       await fetch('/api/users/logout', { method: 'POST', credentials: 'include' });
     } catch (_) {}
     localStorage.removeItem('user');
+    setUser({});
     navigate('/login');
   };
 
@@ -155,7 +290,7 @@ function ResidentDashboard() {
         <button onClick={handleLogout} style={{ background: '#ef4444', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 12px', cursor: 'pointer' }}>Logout</button>
       </header>
 
-      <main style={{ maxWidth: 1000, margin: '24px auto', padding: '0 16px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+      <main style={{ maxWidth: 1200, margin: '24px auto', padding: '0 16px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
         <Card title="Submit Maintenance Request">
           {uiMessage && (
             <div style={{ marginBottom: 8, padding: '8px 12px', borderRadius: 8, fontSize: 14, background: uiMessage.type==='success'?'#d1fae5':uiMessage.type==='error'?'#fee2e2':'#dbeafe', color: uiMessage.type==='success'?'#065f46':uiMessage.type==='error'?'#991b1b':'#1e40af' }}>
@@ -217,6 +352,98 @@ function ResidentDashboard() {
                 <span style={{ fontSize: 12, color: '#6b7280' }}>Page {page} of {Math.max(1, Math.ceil(total/limit))}</span>
                 <button disabled={page>=Math.ceil(total/limit)} onClick={()=>setPage(p=>p+1)} style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid #e5e7eb', background: '#fff', cursor: page>=Math.ceil(total/limit)?'not-allowed':'pointer' }}>Next</button>
               </div>
+            </div>
+          )}
+        </Card>
+
+        <Card title="Amenities & Bookings">
+          {bookingMessage && (  // Use bookingMessage here only
+            <div style={{ marginBottom: 8, padding: '8px 12px', borderRadius: 8, fontSize: 14, background: bookingMessage.type==='success'?'#d1fae5':bookingMessage.type==='error'?'#fee2e2':'#dbeafe', color: bookingMessage.type==='success'?'#065f46':bookingMessage.type==='error'?'#991b1b':'#1e40af' }}>
+              {bookingMessage.message}
+            </div>
+          )}
+          {loadingAmenities ? (
+            <div>Loading amenities...</div>
+          ) : (
+            <div style={{ display: 'grid', gap: 12 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: 12 }}>
+                {amenities.map(amenity => (
+                  <div key={amenity._id} style={{ border: '1px solid #e5e7eb', borderRadius: 8, padding: 12, background: '#fafafa', cursor: 'pointer' }} onClick={() => handleAmenitySelect(amenity)}>
+                    <h4 style={{ margin: 0, fontSize: 14, color: '#111827' }}>{amenity.name}</h4>
+                    <p style={{ margin: '4px 0', fontSize: 12, color: '#6b7280' }}>{amenity.description.substring(0, 50)}...</p>
+                    <div style={{ display: 'flex', gap: 8, marginTop: 6, fontSize: 11 }}>
+                      <span style={{ background: '#f3f4f6', padding: '2px 6px', borderRadius: 4 }}>{amenity.category}</span>
+                      <span style={{ color: '#6b7280' }}>{amenity.location}</span>
+                    </div>
+                    <div style={{ marginTop: 6, fontSize: 12 }}>₹{amenity.pricing.perHour}/hr • {amenity.capacity} people</div>
+                  </div>
+                ))}
+              </div>
+              {selectedAmenity && (
+                <div style={{ marginTop: 16, padding: 12, background: '#f0f9ff', borderRadius: 8 }}>
+                  <h4 style={{ margin: 0, marginBottom: 8 }}>Book {selectedAmenity.name}</h4>
+                  <form onSubmit={handleBookingSubmit} style={{ display: 'grid', gap: 8 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                      <div style={{ display: 'grid', gap: 4 }}>
+                        <label>Date</label>
+                        <input type="date" value={selectedDate} onChange={handleDateChange} min={new Date().toISOString().split('T')[0]} style={{ width: '100%', padding: 8, border: '1px solid #e5e7eb', borderRadius: 6 }} required />
+                      </div>
+                      <div style={{ display: 'grid', gap: 4 }}>
+                        <label>Available Slots</label>
+                        <select 
+                          value={bookingForm.startTime || ''} 
+                          onChange={(e) => {
+                            if (e.target.value) {
+                              const slot = availableSlots.find(s => s.startTime === e.target.value);
+                              if (slot) handleSlotSelect(slot);
+                            }
+                          }} 
+                          style={{ width: '100%', padding: 8, border: '1px solid #e5e7eb', borderRadius: 6 }} 
+                          required
+                        >
+                          <option value="">Select Slot</option>
+                          {availableSlots.map(slot => (
+                            <option key={slot.startTime} value={slot.startTime}>{slot.startTime} - {slot.endTime}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                    <div style={{ display: 'grid', gap: 4 }}>
+                      <label>Purpose *</label>
+                      <input value={bookingForm.purpose} onChange={e => setBookingForm({...bookingForm, purpose: e.target.value})} placeholder="e.g., Family gathering" style={{ width: '100%', padding: 8, border: '1px solid #e5e7eb', borderRadius: 6 }} required />
+                    </div>
+                    <div style={{ display: 'grid', gap: 4 }}>
+                      <label>Number of Guests *</label>
+                      <input type="number" min="1" max={selectedAmenity.capacity} value={bookingForm.numberOfGuests} onChange={e => setBookingForm({...bookingForm, numberOfGuests: parseInt(e.target.value) || 1})} style={{ width: '100%', padding: 8, border: '1px solid #e5e7eb', borderRadius: 6 }} required />
+                    </div>
+                    <button type="submit" disabled={!bookingForm.startTime || !bookingForm.purpose || !bookingForm.numberOfGuests} style={{ background: '#111827', color: '#fff', border: 'none', borderRadius: 6, padding: '8px 12px', cursor: (bookingForm.startTime && bookingForm.purpose && bookingForm.numberOfGuests) ? 'pointer' : 'not-allowed' }}>Book Slot</button>
+                  </form>
+                </div>
+              )}
+            </div>
+          )}
+        </Card>
+
+        <Card title="My Bookings">
+          {loadingBookings ? (
+            <div>Loading...</div>
+          ) : myBookings.length === 0 ? (
+            <div style={{ color: '#6b7280' }}>No bookings yet</div>
+          ) : (
+            <div style={{ display: 'grid', gap: 8 }}>
+              {myBookings.map(b => (
+                <div key={b._id} style={{ border: '1px solid #e5e7eb', borderRadius: 8, padding: 12, background: '#fafafa' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                    <strong>{b.amenityId?.name || 'N/A'}</strong>
+                    <span style={{ fontSize: 12, color: '#6b7280' }}>{new Date(b.bookingDate).toLocaleDateString('en-IN')} {b.startTime} - {b.endTime}</span>
+                  </div>
+                  <div style={{ fontSize: 13, color: '#6b7280', marginTop: 4 }}>Purpose: {b.purpose}</div>
+                  <div style={{ display: 'flex', gap: 8, marginTop: 6, fontSize: 12 }}>
+                    <span style={{ background: '#f3f4f6', padding: '2px 6px', borderRadius: 6 }}>{b.status.toUpperCase()}</span>
+                    <span style={{ background: '#ecfeff', color: '#155e75', padding: '2px 6px', borderRadius: 6 }}>₹{b.totalAmount}</span>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </Card>

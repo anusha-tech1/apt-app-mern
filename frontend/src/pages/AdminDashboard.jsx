@@ -187,8 +187,8 @@ const AdminDashboard = () => {
       { id: 'billing', label: 'Accounts & Billing', icon: DollarSign },
       { id: 'complaints', label: 'Complaints', icon: Wrench },
       { id: 'amenities', label: 'Amenities', icon: Calendar },
-      { id: 'announcements', label: 'Announcements', icon: Bell },
-      { id: 'documents', label: 'Documents', icon: FolderOpen },
+      // { id: 'announcements', label: 'Announcements', icon: Bell },
+      { id: 'documents', label: 'Announcements and Documents', icon: FolderOpen },
       { id: 'staff', label: 'Staff & Vendors', icon: UserCog },
       { id: 'security', label: 'Security', icon: Shield },
       { id: 'analytics', label: 'Analytics', icon: TrendingUp },
@@ -2412,7 +2412,7 @@ const AdminDashboard = () => {
     return (
       <div className="content-section">
         <div className="section-header">
-          <h2>Document Repository</h2>
+          <h2>Announcement and Document Repository</h2>
           <div style={{ display: 'flex', gap: 12 }}>
             <button className="secondary-btn" onClick={() => setDocumentsView('upload')}>
               <FolderOpen size={18} />

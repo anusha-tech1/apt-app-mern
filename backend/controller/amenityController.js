@@ -1,4 +1,5 @@
 import { Amenity, Booking } from '../models/Amenity.js';
+import { User } from "../models/user.model.js";
 import mongoose from 'mongoose';
 
 // Amenity Controllers
@@ -118,6 +119,10 @@ export const getAmenityStats = async (req, res) => {
 // Booking Controllers
 export const createBooking = async (req, res) => {
   try {
+    if (!req.user || !req.user._id) {
+      return res.status(401).json({ message: 'Unauthorized' });
+    }
+
     const { amenityId, bookingDate, startTime, endTime } = req.body;
     
     const amenity = await Amenity.findById(amenityId);
@@ -148,9 +153,17 @@ export const createBooking = async (req, res) => {
     
     const totalAmount = duration * amenity.pricing.perHour + amenity.pricing.securityDeposit;
     
+    // Fetch user info
+    const user = await User.findById(req.user._id).select('name unit');
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
     const booking = new Booking({
       ...req.body,
       userId: req.user._id,
+      residentName: user.name,
+      unit: user.unit || 'N/A', // Assume unit field exists in User; adjust if needed
       duration,
       totalAmount
     });
@@ -173,8 +186,20 @@ export const getAllBookings = async (req, res) => {
     const filter = {};
     
     if (status) filter.status = status;
-    if (amenityId) filter.amenityId = amenityId;
-    if (userId) filter.userId = userId;
+    if (amenityId) {
+      if (mongoose.Types.ObjectId.isValid(amenityId)) {
+        filter.amenityId = new mongoose.Types.ObjectId(amenityId);
+      } else {
+        return res.status(400).json({ message: 'Invalid amenity ID' });
+      }
+    }
+    if (userId) {
+      if (mongoose.Types.ObjectId.isValid(userId)) {
+        filter.userId = new mongoose.Types.ObjectId(userId);
+      } else {
+        return res.status(400).json({ message: 'Invalid user ID' });
+      }
+    }
     if (startDate && endDate) {
       filter.bookingDate = {
         $gte: new Date(startDate),
@@ -299,15 +324,24 @@ export const getAvailableSlots = async (req, res) => {
       return res.status(400).json({ message: 'Amenity ID and date are required' });
     }
     
-    const amenity = await Amenity.findById(amenityId);
+    // Cast amenityId to ObjectId (fixes query mismatch)
+    if (!mongoose.Types.ObjectId.isValid(amenityId)) {
+      return res.status(400).json({ message: 'Invalid amenity ID' });
+    }
+    const castAmenityId = new mongoose.Types.ObjectId(amenityId);
     
+    const amenity = await Amenity.findById(castAmenityId);
     if (!amenity) {
       return res.status(404).json({ message: 'Amenity not found' });
     }
     
+    // Full-day range for bookingDate to handle timezones (e.g., 00:00 to 23:59)
+    const startOfDay = new Date(date + 'T00:00:00.000Z');
+    const endOfDay = new Date(date + 'T23:59:59.999Z');
+    
     const bookings = await Booking.find({
-      amenityId,
-      bookingDate: new Date(date),
+      amenityId: castAmenityId,
+      bookingDate: { $gte: startOfDay, $lt: endOfDay },
       status: { $in: ['pending', 'approved'] }
     }).select('startTime endTime');
     
@@ -332,6 +366,7 @@ export const getAvailableSlots = async (req, res) => {
     
     res.json({ availableSlots });
   } catch (error) {
+    console.error('Available Slots Error:', error);  // Log for debugging
     res.status(500).json({ message: error.message });
   }
 };
