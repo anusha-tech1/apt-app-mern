@@ -1181,6 +1181,734 @@ const AdminDashboard = () => {
     </div>
   );
 
+  const AmenitiesContent = () => {
+    const [amenitiesView, setAmenitiesView] = useState('overview');
+    const [amenities, setAmenities] = useState([]);
+    const [bookings, setBookings] = useState([]);
+    const [amenityStats, setAmenityStats] = useState(null);
+    const [loadingAmenities, setLoadingAmenities] = useState(false);
+    const [selectedAmenity, setSelectedAmenity] = useState(null);
+    
+    const [amenityForm, setAmenityForm] = useState({
+      name: '',
+      description: '',
+      category: 'Indoor',
+      capacity: '',
+      location: '',
+      amenities: '',
+      openTime: '06:00',
+      closeTime: '22:00',
+      maxDuration: 2,
+      advanceBookingDays: 7,
+      minBookingDuration: 1,
+      slotInterval: 1,
+      perHour: 0,
+      perDay: 0,
+      securityDeposit: 0,
+      status: 'active'
+    });
+
+    const [bookingFilter, setBookingFilter] = useState('all');
+
+    useEffect(() => {
+      if (activeTab === 'amenities') {
+        fetchAmenitiesData();
+      }
+    }, [activeTab]);
+
+    const fetchAmenitiesData = async () => {
+      setLoadingAmenities(true);
+      try {
+        const [amenitiesRes, bookingsRes, statsRes] = await Promise.all([
+          fetch('/api/amenities/amenities', { credentials: 'include' }),
+          fetch('/api/amenities/bookings', { credentials: 'include' }),
+          fetch('/api/amenities/amenities/stats', { credentials: 'include' })
+        ]);
+
+        if (amenitiesRes.ok) {
+          const data = await amenitiesRes.json();
+          setAmenities(data.amenities || []);
+        }
+
+        if (bookingsRes.ok) {
+          const data = await bookingsRes.json();
+          setBookings(data.bookings || []);
+        }
+
+        if (statsRes.ok) {
+          const data = await statsRes.json();
+          setAmenityStats(data.stats || null);
+        }
+      } catch (err) {
+        setUiMessage({ type: 'error', message: 'Failed to fetch amenities data' });
+      } finally {
+        setLoadingAmenities(false);
+      }
+    };
+
+    const handleCreateAmenity = async (e) => {
+      e.preventDefault();
+      setUiMessage({ type: 'loading', message: 'Creating amenity...' });
+
+      try {
+        const amenitiesArray = amenityForm.amenities.split(',').map(a => a.trim()).filter(a => a);
+        
+        const payload = {
+          name: amenityForm.name,
+          description: amenityForm.description,
+          category: amenityForm.category,
+          capacity: Number(amenityForm.capacity),
+          location: amenityForm.location,
+          amenities: amenitiesArray,
+          timings: {
+            openTime: amenityForm.openTime,
+            closeTime: amenityForm.closeTime
+          },
+          bookingRules: {
+            maxDuration: Number(amenityForm.maxDuration),
+            advanceBookingDays: Number(amenityForm.advanceBookingDays),
+            minBookingDuration: Number(amenityForm.minBookingDuration),
+            slotInterval: Number(amenityForm.slotInterval)
+          },
+          pricing: {
+            perHour: Number(amenityForm.perHour),
+            perDay: Number(amenityForm.perDay),
+            securityDeposit: Number(amenityForm.securityDeposit)
+          },
+          status: amenityForm.status
+        };
+
+        const res = await fetch('/api/amenities/amenities', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(payload)
+        });
+
+        const data = await res.json();
+        
+        if (!res.ok) throw new Error(data.message || 'Failed to create amenity');
+        
+        setUiMessage({ type: 'success', message: 'Amenity created successfully' });
+        setAmenityForm({
+          name: '',
+          description: '',
+          category: 'Indoor',
+          capacity: '',
+          location: '',
+          amenities: '',
+          openTime: '06:00',
+          closeTime: '22:00',
+          maxDuration: 2,
+          advanceBookingDays: 7,
+          minBookingDuration: 1,
+          slotInterval: 1,
+          perHour: 0,
+          perDay: 0,
+          securityDeposit: 0,
+          status: 'active'
+        });
+        setAmenitiesView('overview');
+        fetchAmenitiesData();
+      } catch (err) {
+        setUiMessage({ type: 'error', message: err.message });
+      }
+    };
+
+    const handleUpdateAmenity = async (amenityId, updates) => {
+      try {
+        const res = await fetch(`/api/amenities/amenities/${amenityId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(updates)
+        });
+
+        const data = await res.json();
+        
+        if (!res.ok) throw new Error(data.message || 'Failed to update amenity');
+        
+        setUiMessage({ type: 'success', message: 'Amenity updated successfully' });
+        fetchAmenitiesData();
+      } catch (err) {
+        setUiMessage({ type: 'error', message: err.message });
+      }
+    };
+
+    const handleDeleteAmenity = async (amenityId) => {
+      if (!confirm('Are you sure you want to delete this amenity? All related bookings will also be deleted.')) return;
+      
+      try {
+        const res = await fetch(`/api/amenities/amenities/${amenityId}`, {
+          method: 'DELETE',
+          credentials: 'include'
+        });
+
+        const data = await res.json();
+        
+        if (!res.ok) throw new Error(data.message || 'Failed to delete amenity');
+        
+        setUiMessage({ type: 'success', message: 'Amenity deleted successfully' });
+        fetchAmenitiesData();
+      } catch (err) {
+        setUiMessage({ type: 'error', message: err.message });
+      }
+    };
+
+    const handleBookingAction = async (bookingId, action, rejectionReason = '') => {
+      try {
+        const res = await fetch(`/api/amenities/bookings/${bookingId}/status`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ status: action, rejectionReason })
+        });
+
+        const data = await res.json();
+        
+        if (!res.ok) throw new Error(data.message || `Failed to ${action} booking`);
+        
+        setUiMessage({ type: 'success', message: `Booking ${action} successfully` });
+        fetchAmenitiesData();
+      } catch (err) {
+        setUiMessage({ type: 'error', message: err.message });
+      }
+    };
+
+    const handleMarkPaid = async (bookingId) => {
+      try {
+        const res = await fetch(`/api/amenities/bookings/${bookingId}/payment`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ paymentMethod: 'online' })
+        });
+
+        const data = await res.json();
+        
+        if (!res.ok) throw new Error(data.message || 'Failed to mark as paid');
+        
+        setUiMessage({ type: 'success', message: 'Payment marked as paid' });
+        fetchAmenitiesData();
+      } catch (err) {
+        setUiMessage({ type: 'error', message: err.message });
+      }
+    };
+
+    const filteredBookings = bookingFilter === 'all' 
+      ? bookings 
+      : bookings.filter(b => b.status === bookingFilter);
+
+    const totalAmenities = amenityStats?.totalAmenities || 0;
+    const activeAmenities = amenityStats?.activeAmenities || 0;
+    const totalBookings = amenityStats?.totalBookings || 0;
+    const pendingBookings = amenityStats?.pendingBookings || 0;
+
+    return (
+      <div className="content-section">
+        <div className="section-header">
+          <h2>Amenity & Facility Management</h2>
+          <div style={{ display: 'flex', gap: 12 }}>
+            <button className="secondary-btn" onClick={() => setAmenitiesView('create-amenity')}>
+              <Calendar size={18} />
+              Add New Amenity
+            </button>
+            <button className="primary-btn" onClick={() => setAmenitiesView('bookings')}>
+              <FileText size={18} />
+              View All Bookings
+            </button>
+          </div>
+        </div>
+
+        {uiMessage && amenitiesView === 'overview' && (
+          <div className={`message ${uiMessage.type}`}>
+            {uiMessage.message}
+          </div>
+        )}
+
+        {loadingAmenities ? (
+          <div className="loading">Loading amenities data...</div>
+        ) : amenitiesView === 'overview' ? (
+          <>
+            <div className="stats-grid" style={{ marginBottom: 32 }}>
+              <div className="stat-card">
+                <div className="stat-icon" style={{ backgroundColor: '#3b82f615' }}>
+                  <Calendar size={24} style={{ color: '#3b82f6' }} />
+                </div>
+                <div className="stat-content">
+                  <div className="stat-title">Total Amenities</div>
+                  <div className="stat-value">{totalAmenities}</div>
+                  <div className="stat-change positive">{activeAmenities} Active</div>
+                </div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-icon" style={{ backgroundColor: '#10b98115' }}>
+                  <FileText size={24} style={{ color: '#10b981' }} />
+                </div>
+                <div className="stat-content">
+                  <div className="stat-title">Total Bookings</div>
+                  <div className="stat-value">{totalBookings}</div>
+                  <div className="stat-change positive">All time</div>
+                </div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-icon" style={{ backgroundColor: '#f59e0b15' }}>
+                  <Bell size={24} style={{ color: '#f59e0b' }} />
+                </div>
+                <div className="stat-content">
+                  <div className="stat-title">Pending Approvals</div>
+                  <div className="stat-value">{pendingBookings}</div>
+                  <div className="stat-change negative">Requires action</div>
+                </div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-icon" style={{ backgroundColor: '#8b5cf615' }}>
+                  <DollarSign size={24} style={{ color: '#8b5cf6' }} />
+                </div>
+                <div className="stat-content">
+                  <div className="stat-title">Revenue</div>
+                  <div className="stat-value">₹{(amenityStats?.totalRevenue || 0).toLocaleString()}</div>
+                  <div className="stat-change positive">From bookings</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="table-container">
+              <div style={{ padding: '16px 20px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h3 style={{ margin: 0 }}>All Amenities</h3>
+                <button className="secondary-btn" onClick={() => setAmenitiesView('create-amenity')}>
+                  <Calendar size={16} />
+                  Add New
+                </button>
+              </div>
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Amenity Name</th>
+                    <th>Category</th>
+                    <th>Location</th>
+                    <th>Capacity</th>
+                    <th>Timings</th>
+                    <th>Pricing</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {amenities.length === 0 ? (
+                    <tr>
+                      <td colSpan="8" style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>
+                        No amenities found. Create your first amenity to get started.
+                      </td>
+                    </tr>
+                  ) : (
+                    amenities.map(amenity => (
+                      <tr key={amenity._id}>
+                        <td>
+                          <div style={{ fontWeight: 600, color: '#0f172a' }}>{amenity.name}</div>
+                          <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>{amenity.description.substring(0, 50)}...</div>
+                        </td>
+                        <td>
+                          <span className="category-badge" style={{ padding: '4px 12px', background: '#f3f4f6', borderRadius: 12, fontSize: 12 }}>
+                            {amenity.category}
+                          </span>
+                        </td>
+                        <td>{amenity.location}</td>
+                        <td>{amenity.capacity} people</td>
+                        <td style={{ fontSize: 13 }}>
+                          {amenity.timings.openTime} - {amenity.timings.closeTime}
+                        </td>
+                        <td>
+                          <div style={{ fontSize: 13 }}>
+                            <div>₹{amenity.pricing.perHour}/hr</div>
+                            {amenity.pricing.securityDeposit > 0 && (
+                              <div style={{ color: '#64748b', fontSize: 11 }}>
+                                +₹{amenity.pricing.securityDeposit} deposit
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                        <td>
+                          <span className={`status-badge ${amenity.status === 'active' ? 'active' : amenity.status === 'maintenance' ? 'pending' : 'inactive'}`}>
+                            {amenity.status.toUpperCase()}
+                          </span>
+                        </td>
+                        <td>
+                          <div className="action-buttons">
+                            <button 
+                              onClick={() => {
+                                setSelectedAmenity(amenity);
+                                setAmenitiesView('edit-amenity');
+                              }} 
+                              className="btn-save" 
+                              style={{ fontSize: 11 }}
+                            >
+                              Edit
+                            </button>
+                            <button 
+                              onClick={() => handleUpdateAmenity(amenity._id, { 
+                                status: amenity.status === 'active' ? 'inactive' : 'active' 
+                              })} 
+                              className="btn-toggle" 
+                              style={{ fontSize: 11 }}
+                            >
+                              {amenity.status === 'active' ? 'Disable' : 'Enable'}
+                            </button>
+                            <button 
+                              onClick={() => handleDeleteAmenity(amenity._id)} 
+                              className="btn-delete" 
+                              style={{ fontSize: 11 }}
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </>
+        ) : amenitiesView === 'create-amenity' || amenitiesView === 'edit-amenity' ? (
+          <div className="form-card">
+            <div className="section-header" style={{ marginBottom: 24 }}>
+              <h3 style={{ margin: 0 }}>
+                {amenitiesView === 'create-amenity' ? 'Create New Amenity' : 'Edit Amenity'}
+              </h3>
+              <button className="secondary-btn" onClick={() => {
+                setAmenitiesView('overview');
+                setSelectedAmenity(null);
+              }}>
+                Back to List
+              </button>
+            </div>
+
+            {uiMessage && (
+              <div className={`message ${uiMessage.type}`}>
+                {uiMessage.message}
+              </div>
+            )}
+
+            <form onSubmit={handleCreateAmenity}>
+              <div style={{ background: '#f8fafc', padding: 24, borderRadius: 12, marginBottom: 24 }}>
+                <h4 style={{ marginBottom: 16, color: '#1e293b' }}>Basic Information</h4>
+                <div className="form-grid">
+                  <div className="form-group">
+                    <label>Amenity Name *</label>
+                    <input
+                      value={amenityForm.name}
+                      onChange={e => setAmenityForm({...amenityForm, name: e.target.value})}
+                      placeholder="e.g., Swimming Pool"
+                      required
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Category *</label>
+                    <select
+                      value={amenityForm.category}
+                      onChange={e => setAmenityForm({...amenityForm, category: e.target.value})}
+                      required
+                    >
+                      <option value="Indoor">Indoor</option>
+                      <option value="Outdoor">Outdoor</option>
+                      <option value="Sports">Sports</option>
+                      <option value="Recreation">Recreation</option>
+                      <option value="Meeting">Meeting</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label>Location *</label>
+                    <input
+                      value={amenityForm.location}
+                      onChange={e => setAmenityForm({...amenityForm, location: e.target.value})}
+                      placeholder="e.g., Ground Floor, Block A"
+                      required
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Capacity *</label>
+                    <input
+                      type="number"
+                      value={amenityForm.capacity}
+                      onChange={e => setAmenityForm({...amenityForm, capacity: e.target.value})}
+                      placeholder="Max number of people"
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label>Description *</label>
+                  <textarea
+                    value={amenityForm.description}
+                    onChange={e => setAmenityForm({...amenityForm, description: e.target.value})}
+                    placeholder="Brief description of the amenity"
+                    rows="3"
+                    required
+                    style={{ padding: '10px 14px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 14, fontFamily: 'inherit', resize: 'vertical', width: '100%' }}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Available Facilities (comma-separated)</label>
+                  <input
+                    value={amenityForm.amenities}
+                    onChange={e => setAmenityForm({...amenityForm, amenities: e.target.value})}
+                    placeholder="e.g., WiFi, Air Conditioning, Projector"
+                  />
+                </div>
+              </div>
+
+              <div style={{ background: '#f8fafc', padding: 24, borderRadius: 12, marginBottom: 24 }}>
+                <h4 style={{ marginBottom: 16, color: '#1e293b' }}>Timing & Booking Rules</h4>
+                <div className="form-grid">
+                  <div className="form-group">
+                    <label>Opening Time *</label>
+                    <input
+                      type="time"
+                      value={amenityForm.openTime}
+                      onChange={e => setAmenityForm({...amenityForm, openTime: e.target.value})}
+                      required
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Closing Time *</label>
+                    <input
+                      type="time"
+                      value={amenityForm.closeTime}
+                      onChange={e => setAmenityForm({...amenityForm, closeTime: e.target.value})}
+                      required
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Max Duration (hours) *</label>
+                    <input
+                      type="number"
+                      value={amenityForm.maxDuration}
+                      onChange={e => setAmenityForm({...amenityForm, maxDuration: e.target.value})}
+                      placeholder="e.g., 2"
+                      required
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Min Duration (hours) *</label>
+                    <input
+                      type="number"
+                      value={amenityForm.minBookingDuration}
+                      onChange={e => setAmenityForm({...amenityForm, minBookingDuration: e.target.value})}
+                      placeholder="e.g., 1"
+                      required
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Slot Interval (hours) *</label>
+                    <input
+                      type="number"
+                      value={amenityForm.slotInterval}
+                      onChange={e => setAmenityForm({...amenityForm, slotInterval: e.target.value})}
+                      placeholder="e.g., 1"
+                      required
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Advance Booking Days *</label>
+                    <input
+                      type="number"
+                      value={amenityForm.advanceBookingDays}
+                      onChange={e => setAmenityForm({...amenityForm, advanceBookingDays: e.target.value})}
+                      placeholder="e.g., 7"
+                      required
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ background: '#f8fafc', padding: 24, borderRadius: 12, marginBottom: 24 }}>
+                <h4 style={{ marginBottom: 16, color: '#1e293b' }}>Pricing</h4>
+                <div className="form-grid">
+                  <div className="form-group">
+                    <label>Price per Hour</label>
+                    <input
+                      type="number"
+                      value={amenityForm.perHour}
+                      onChange={e => setAmenityForm({...amenityForm, perHour: e.target.value})}
+                      placeholder="0"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Price per Day</label>
+                    <input
+                      type="number"
+                      value={amenityForm.perDay}
+                      onChange={e => setAmenityForm({...amenityForm, perDay: e.target.value})}
+                      placeholder="0"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Security Deposit</label>
+                    <input
+                      type="number"
+                      value={amenityForm.securityDeposit}
+                      onChange={e => setAmenityForm({...amenityForm, securityDeposit: e.target.value})}
+                      placeholder="0"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Status *</label>
+                    <select
+                      value={amenityForm.status}
+                      onChange={e => setAmenityForm({...amenityForm, status: e.target.value})}
+                      required
+                    >
+                      <option value="active">Active</option>
+                      <option value="inactive">Inactive</option>
+                      <option value="maintenance">Under Maintenance</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <button type="submit" className="primary-btn" style={{ width: '100%', justifyContent: 'center' }}>
+                {amenitiesView === 'create-amenity' ? 'Create Amenity' : 'Update Amenity'}
+              </button>
+            </form>
+          </div>
+        ) : (
+          <div>
+            <div style={{ display: 'flex', gap: 12, marginBottom: 24, flexWrap: 'wrap' }}>
+              {['all', 'pending', 'approved', 'rejected', 'cancelled'].map(filter => (
+                <button
+                  key={filter}
+                  onClick={() => setBookingFilter(filter)}
+                  className={`filter-btn ${bookingFilter === filter ? 'active' : ''}`}
+                >
+                  {filter.charAt(0).toUpperCase() + filter.slice(1)}
+                  {filter === 'all' && ` (${bookings.length})`}
+                  {filter === 'pending' && ` (${bookings.filter(b => b.status === 'pending').length})`}
+                </button>
+              ))}
+            </div>
+
+            {uiMessage && (
+              <div className={`message ${uiMessage.type}`}>
+                {uiMessage.message}
+              </div>
+            )}
+
+            <div className="table-container">
+              <div style={{ padding: '16px 20px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h3 style={{ margin: 0 }}>
+                  {bookingFilter === 'all' ? 'All Bookings' : `${bookingFilter.charAt(0).toUpperCase() + bookingFilter.slice(1)} Bookings`}
+                </h3>
+                <button className="secondary-btn" onClick={() => setAmenitiesView('overview')}>
+                  Back to Overview
+                </button>
+              </div>
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Amenity</th>
+                    <th>Resident</th>
+                    <th>Unit</th>
+                    <th>Date & Time</th>
+                    <th>Duration</th>
+                    <th>Amount</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredBookings.length === 0 ? (
+                    <tr>
+                      <td colSpan="8" style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>
+                        No bookings found.
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredBookings.map(booking => (
+                      <tr key={booking._id}>
+                        <td>
+                          <div style={{ fontWeight: 600, color: '#0f172a' }}>{booking.amenityId?.name || 'N/A'}</div>
+                          <div style={{ fontSize: 12, color: '#64748b' }}>{booking.amenityId?.category}</div>
+                        </td>
+                        <td>{booking.residentName}</td>
+                        <td>{booking.unit}</td>
+                        <td>
+                          <div style={{ fontSize: 13 }}>
+                            <div>{new Date(booking.bookingDate).toLocaleDateString('en-IN')}</div>
+                            <div style={{ color: '#64748b' }}>{booking.startTime} - {booking.endTime}</div>
+                          </div>
+                        </td>
+                        <td>{booking.duration} hrs</td>
+                        <td><strong>₹{booking.totalAmount.toLocaleString()}</strong></td>
+                        <td>
+                          <span className={`status-badge ${
+                            booking.status === 'approved' ? 'active' : 
+                            booking.status === 'rejected' || booking.status === 'cancelled' ? 'inactive' : 
+                            'pending'
+                          }`}>
+                            {booking.status.toUpperCase()}
+                          </span>
+                        </td>
+                        <td>
+                          <div className="action-buttons">
+                            {booking.status === 'pending' && (
+                              <>
+                                <button 
+                                  onClick={() => handleBookingAction(booking._id, 'approved')} 
+                                  className="btn-save" 
+                                  style={{ fontSize: 11 }}
+                                >
+                                  Approve
+                                </button>
+                                <button 
+                                  onClick={() => {
+                                    const reason = prompt('Rejection reason:');
+                                    if (reason) handleBookingAction(booking._id, 'rejected', reason);
+                                  }} 
+                                  className="btn-delete" 
+                                  style={{ fontSize: 11 }}
+                                >
+                                  Reject
+                                </button>
+                              </>
+                            )}
+                            {booking.status === 'approved' && booking.paymentStatus === 'pending' && (
+                              <button 
+                                onClick={() => handleMarkPaid(booking._id)} 
+                                className="btn-toggle" 
+                                style={{ fontSize: 11 }}
+                              >
+                                Mark Paid
+                              </button>
+                            )}
+                            {booking.paymentStatus === 'paid' && (
+                              <span style={{ fontSize: 11, color: '#10b981', fontWeight: 600 }}>PAID</span>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // const PlaceholderContent = ({ title, description }) => (
+  //   <div className="content-section">
+  //     <h2>{title}</h2>
+  //     <div className="placeholder-content">
+  //       <MessageSquare size={48} style={{ color: '#9ca3af' }} />
+  //       <p>{description}</p>
+  //       <p className="text-muted">This module is under development</p>
+  //     </div>
+  //   </div>
+  // );
+
   return (
     <>
       <style>{`
@@ -1677,8 +2405,7 @@ const AdminDashboard = () => {
           {activeTab === 'create-user' && <CreateUserContent />}
           {activeTab === 'billing' && <BillingContent />}
           {activeTab === 'complaints' && <PlaceholderContent title="Complaints & Maintenance" description="Track and resolve resident complaints" />}
-          {activeTab === 'amenities' && <PlaceholderContent title="Amenity Management" description="Manage bookings for common facilities" />}
-          {activeTab === 'announcements' && <PlaceholderContent title="Announcements" description="Create and manage community announcements" />}
+          {activeTab === 'amenities' && <AmenitiesContent />}          {activeTab === 'announcements' && <PlaceholderContent title="Announcements" description="Create and manage community announcements" />}
           {activeTab === 'documents' && <PlaceholderContent title="Document Repository" description="Store and manage important documents" />}
           {activeTab === 'staff' && <PlaceholderContent title="Staff & Vendors" description="Manage staff attendance and vendor information" />}
           {activeTab === 'security' && <PlaceholderContent title="Security Management" description="Monitor visitor logs and security activities" />}
