@@ -1824,70 +1824,72 @@ const AdminDashboard = () => {
                       </td>
                     </tr>
                   ) : (
-                    filteredBookings.map(booking => (
-                      <tr key={booking._id}>
-                        <td>
-                          <div style={{ fontWeight: 600, color: '#0f172a' }}>{booking.amenityId?.name || 'N/A'}</div>
-                          <div style={{ fontSize: 12, color: '#64748b' }}>{booking.amenityId?.category}</div>
-                        </td>
-                        <td>{booking.residentName}</td>
-                        <td>{booking.unit}</td>
-                        <td>
-                          <div style={{ fontSize: 13 }}>
-                            <div>{new Date(booking.bookingDate).toLocaleDateString('en-IN')}</div>
-                            <div style={{ color: '#64748b' }}>{booking.startTime} - {booking.endTime}</div>
-                          </div>
-                        </td>
-                        <td>{booking.duration} hrs</td>
-                        <td><strong>₹{booking.totalAmount.toLocaleString()}</strong></td>
-                        <td>
-                          <span className={`status-badge ${
-                            booking.status === 'approved' ? 'active' : 
-                            booking.status === 'rejected' || booking.status === 'cancelled' ? 'inactive' : 
-                            'pending'
-                          }`}>
-                            {booking.status.toUpperCase()}
-                          </span>
-                        </td>
-                        <td>
-                          <div className="action-buttons">
-                            {booking.status === 'pending' && (
-                              <>
-                                <button 
-                                  onClick={() => handleBookingAction(booking._id, 'approved')} 
-                                  className="btn-save" 
+                    filteredBookings.map((booking) => {
+                      return (
+                        <tr key={booking._id}>
+                          <td>
+                            <div style={{ fontWeight: 600, color: '#0f172a' }}>{booking.amenityId?.name || 'N/A'}</div>
+                            <div style={{ fontSize: 12, color: '#64748b' }}>{booking.amenityId?.category}</div>
+                          </td>
+                          <td>{booking.residentName}</td>
+                          <td>{booking.unit}</td>
+                          <td>
+                            <div style={{ fontSize: 13 }}>
+                              <div>{new Date(booking.bookingDate).toLocaleDateString('en-IN')}</div>
+                              <div style={{ color: '#64748b' }}>{booking.startTime} - {booking.endTime}</div>
+                            </div>
+                          </td>
+                          <td>{booking.duration} hrs</td>
+                          <td><strong>₹{booking.totalAmount.toLocaleString()}</strong></td>
+                          <td>
+                            <span className={`status-badge ${
+                              booking.status === 'approved' ? 'active' :
+                              (booking.status === 'rejected' || booking.status === 'cancelled') ? 'inactive' :
+                              'pending'
+                            }`}>
+                              {booking.status.toUpperCase()}
+                            </span>
+                          </td>
+                          <td>
+                            <div className="action-buttons">
+                              {booking.status === 'pending' && (
+                                <>
+                                  <button
+                                    onClick={() => handleBookingAction(booking._id, 'approved')}
+                                    className="btn-save"
+                                    style={{ fontSize: 11 }}
+                                  >
+                                    Approve
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      const reason = prompt('Rejection reason:');
+                                      if (reason) handleBookingAction(booking._id, 'rejected', reason);
+                                    }}
+                                    className="btn-delete"
+                                    style={{ fontSize: 11 }}
+                                  >
+                                    Reject
+                                  </button>
+                                </>
+                              )}
+                              {booking.status === 'approved' && booking.paymentStatus === 'pending' && (
+                                <button
+                                  onClick={() => handleMarkPaid(booking._id)}
+                                  className="btn-toggle"
                                   style={{ fontSize: 11 }}
                                 >
-                                  Approve
+                                  Mark Paid
                                 </button>
-                                <button 
-                                  onClick={() => {
-                                    const reason = prompt('Rejection reason:');
-                                    if (reason) handleBookingAction(booking._id, 'rejected', reason);
-                                  }} 
-                                  className="btn-delete" 
-                                  style={{ fontSize: 11 }}
-                                >
-                                  Reject
-                                </button>
-                              </>
-                            )}
-                            {booking.status === 'approved' && booking.paymentStatus === 'pending' && (
-                              <button 
-                                onClick={() => handleMarkPaid(booking._id)} 
-                                className="btn-toggle" 
-                                style={{ fontSize: 11 }}
-                              >
-                                Mark Paid
-                              </button>
-                            )}
-                            {booking.paymentStatus === 'paid' && (
-                              <span style={{ fontSize: 11, color: '#10b981', fontWeight: 600 }}>PAID</span>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                              )}
+                              {booking.paymentStatus === 'paid' && (
+                                <span style={{ fontSize: 11, color: '#10b981', fontWeight: 600 }}>PAID</span>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>
