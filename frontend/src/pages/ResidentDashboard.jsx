@@ -1,5 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import {
+  Home, Users, DollarSign, Wrench, Calendar,
+  Bell, FolderOpen, UserCog, Shield, TrendingUp, LogOut
+} from 'lucide-react';
 
 const Card = ({ title, children }) => (
   <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, padding: 16 }}>
@@ -19,7 +23,11 @@ function ResidentDashboard() {
   const [page, setPage] = useState(1);
   const [limit] = useState(5);
   const [total, setTotal] = useState(0);
+<<<<<<< HEAD
   const [filters, setFilters] = useState({ category: 'all', search: '' });
+=======
+  const [activeTab, setActiveTab] = useState('overview');
+>>>>>>> 8d67d07 (Resident dashboard with sidebar)
   const categories = ['Plumbing','Electrical','Carpentry','Cleaning','Security','Parking','Elevator','Common Area','Noise','Other'];
   const priorities = ['low','medium','high','urgent'];
   const documentCategories = [
@@ -36,6 +44,46 @@ function ResidentDashboard() {
     fetchMyComplaints(); 
     fetchDocuments();
   }, [page, filters]);
+
+  const Sidebar = () => {
+    const menuItems = [
+      { id: 'overview', label: 'Overview', icon: Home },
+      { id: 'residents', label: 'Residents & Units', icon: Users },
+      { id: 'billing', label: 'Accounts & Billing', icon: DollarSign },
+      { id: 'complaints', label: 'Complaints', icon: Wrench },
+      { id: 'amenities', label: 'Amenities', icon: Calendar },
+      { id: 'announcements', label: 'Announcements', icon: Bell },
+      { id: 'documents', label: 'Documents', icon: FolderOpen },
+      { id: 'staff', label: 'Staff & Vendors', icon: UserCog },
+      { id: 'security', label: 'Security', icon: Shield },
+      { id: 'analytics', label: 'Analytics', icon: TrendingUp },
+    ];
+
+    return (
+      <div className="sidebar">
+        <div className="logo">
+          <Home size={32} />
+          <span>ApartManager</span>
+        </div>
+        <nav>
+          {menuItems.map(item => (
+            <button
+              key={item.id}
+              onClick={() => item.id === 'analytics' ? navigate('/analytics') : setActiveTab(item.id)}
+              className={`menu-item ${activeTab === item.id ? 'active' : ''}`}
+            >
+              <item.icon size={20} />
+              <span>{item.label}</span>
+            </button>
+          ))}
+        </nav>
+        <button onClick={handleLogout} className="logout-btn">
+          <LogOut size={20} />
+          <span>Logout</span>
+        </button>
+      </div>
+    );
+  };
 
   const fetchMyComplaints = async () => {
     setLoading(true);
@@ -149,165 +197,118 @@ function ResidentDashboard() {
   };
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#f3f4f6' }}>
-      <header style={{ background: '#111827', color: '#fff', padding: '16px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <h2 style={{ margin: 0 }}>Resident Dashboard</h2>
-        <button onClick={handleLogout} style={{ background: '#ef4444', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 12px', cursor: 'pointer' }}>Logout</button>
-      </header>
+    <>
+      <style>{`
+        .sidebar {
+          position: fixed;
+          left: 0;
+          top: 0;
+          width: 240px;
+          height: 100vh;
+          background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+          color: white;
+          display: flex;
+          flex-direction: column;
+          padding: 24px 16px;
+        }
+        .logo { display: flex; align-items: center; gap: 12px; font-size: 18px; font-weight: 700; margin-bottom: 24px; }
+        .menu-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; color: #94a3b8; background: transparent; border: none; border-radius: 8px; cursor: pointer; text-align: left; }
+        .menu-item:hover { background: rgba(255,255,255,0.08); color: #fff; }
+        .menu-item.active { background: #3b82f6; color: #fff; }
+        .logout-btn { margin-top: auto; background: #ef4444; color: #fff; border: none; border-radius: 8px; padding: 10px 12px; cursor: pointer; display: flex; align-items: center; gap: 8px; }
+        .main-content { margin-left: 240px; min-height: 100vh; background: #f3f4f6; }
+        .main-inner { max-width: 1000px; margin: 24px auto; padding: 0 16px; }
+      `}</style>
 
-      <main style={{ maxWidth: 1000, margin: '24px auto', padding: '0 16px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-        <Card title="Submit Maintenance Request">
-          {uiMessage && (
-            <div style={{ marginBottom: 8, padding: '8px 12px', borderRadius: 8, fontSize: 14, background: uiMessage.type==='success'?'#d1fae5':uiMessage.type==='error'?'#fee2e2':'#dbeafe', color: uiMessage.type==='success'?'#065f46':uiMessage.type==='error'?'#991b1b':'#1e40af' }}>
-              {uiMessage.message}
-            </div>
-          )}
-          <form onSubmit={handleSubmit} style={{ display: 'grid', gap: 8 }}>
-            <div style={{ display: 'grid', gap: 4 }}>
-              <label>Title</label>
-              <input value={form.title} onChange={e=>setForm({...form, title:e.target.value})} required style={{ padding: 10, border: '1px solid #e5e7eb', borderRadius: 8 }} placeholder="Short title e.g. Leakage in kitchen" />
-            </div>
-            <div style={{ display: 'grid', gap: 4 }}>
-              <label>Description</label>
-              <textarea value={form.description} onChange={e=>setForm({...form, description:e.target.value})} required rows={4} style={{ padding: 10, border: '1px solid #e5e7eb', borderRadius: 8 }} placeholder="Describe the issue..." />
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-              <div style={{ display: 'grid', gap: 4 }}>
-                <label>Category</label>
-                <select value={form.category} onChange={e=>setForm({...form, category:e.target.value})} style={{ padding: 10, border: '1px solid #e5e7eb', borderRadius: 8 }}>
-                  {categories.map(c=>(<option key={c} value={c}>{c}</option>))}
-                </select>
-              </div>
-              <div style={{ display: 'grid', gap: 4 }}>
-                <label>Priority</label>
-                <select value={form.priority} onChange={e=>setForm({...form, priority:e.target.value})} style={{ padding: 10, border: '1px solid #e5e7eb', borderRadius: 8 }}>
-                  {priorities.map(p=>(<option key={p} value={p}>{p.toUpperCase()}</option>))}
-                </select>
-              </div>
-            </div>
-            <div>
-              <button type="submit" style={{ background: '#111827', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 14px', cursor: 'pointer' }}>Submit</button>
-            </div>
-          </form>
-        </Card>
+      <div style={{ display: 'flex' }}>
+        <Sidebar />
+        <div className="main-content">
+          <header style={{ background: '#111827', color: '#fff', padding: '16px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <h2 style={{ margin: 0 }}>Resident Dashboard</h2>
+            <button onClick={handleLogout} style={{ background: '#ef4444', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 12px', cursor: 'pointer' }}>Logout</button>
+          </header>
 
-        <Card title="My Complaints">
-          {loading ? (
-            <div>Loading...</div>
-          ) : myComplaints.length === 0 ? (
-            <div style={{ color: '#6b7280' }}>No complaints yet</div>
-          ) : (
-            <div style={{ display: 'grid', gap: 8 }}>
-              {myComplaints.map(c => (
-                <div key={c._id} style={{ border: '1px solid #e5e7eb', borderRadius: 8, padding: 12, background: '#fafafa' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
-                    <strong>{c.title}</strong>
-                    <span style={{ fontSize: 12, color: '#6b7280' }}>{new Date(c.created_at).toLocaleString('en-IN')}</span>
+          <main className="main-inner" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+            <Card title="Submit Maintenance Request">
+              {uiMessage && (
+                <div style={{ marginBottom: 8, padding: '8px 12px', borderRadius: 8, fontSize: 14, background: uiMessage.type==='success'?'#d1fae5':uiMessage.type==='error'?'#fee2e2':'#dbeafe', color: uiMessage.type==='success'?'#065f46':uiMessage.type==='error'?'#991b1b':'#1e40af' }}>
+                  {uiMessage.message}
+                </div>
+              )}
+              <form onSubmit={handleSubmit} style={{ display: 'grid', gap: 8 }}>
+                <div style={{ display: 'grid', gap: 4 }}>
+                  <label>Title</label>
+                  <input value={form.title} onChange={e=>setForm({...form, title:e.target.value})} required style={{ padding: 10, border: '1px solid #e5e7eb', borderRadius: 8 }} placeholder="Short title e.g. Leakage in kitchen" />
+                </div>
+                <div style={{ display: 'grid', gap: 4 }}>
+                  <label>Description</label>
+                  <textarea value={form.description} onChange={e=>setForm({...form, description:e.target.value})} required rows={4} style={{ padding: 10, border: '1px solid #e5e7eb', borderRadius: 8 }} placeholder="Describe the issue..." />
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                  <div style={{ display: 'grid', gap: 4 }}>
+                    <label>Category</label>
+                    <select value={form.category} onChange={e=>setForm({...form, category:e.target.value})} style={{ padding: 10, border: '1px solid #e5e7eb', borderRadius: 8 }}>
+                      {categories.map(c=>(<option key={c} value={c}>{c}</option>))}
+                    </select>
                   </div>
-                  <div style={{ fontSize: 13, color: '#6b7280', marginTop: 4 }}>{c.description}</div>
-                  <div style={{ display: 'flex', gap: 8, marginTop: 6, fontSize: 12 }}>
-                    <span style={{ background: '#f3f4f6', padding: '2px 6px', borderRadius: 6 }}>{c.category}</span>
-                    <span style={{ background: '#eef2ff', color: '#3730a3', padding: '2px 6px', borderRadius: 6 }}>{c.priority.toUpperCase()}</span>
-                    <span style={{ background: '#ecfeff', color: '#155e75', padding: '2px 6px', borderRadius: 6 }}>{c.status.replace('_',' ').toUpperCase()}</span>
+                  <div style={{ display: 'grid', gap: 4 }}>
+                    <label>Priority</label>
+                    <select value={form.priority} onChange={e=>setForm({...form, priority:e.target.value})} style={{ padding: 10, border: '1px solid #e5e7eb', borderRadius: 8 }}>
+                      {priorities.map(p=>(<option key={p} value={p}>{p.toUpperCase()}</option>))}
+                    </select>
                   </div>
                 </div>
-              ))}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
-                <button disabled={page<=1} onClick={()=>setPage(p=>Math.max(1,p-1))} style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid #e5e7eb', background: '#fff', cursor: page<=1?'not-allowed':'pointer' }}>Prev</button>
-                <span style={{ fontSize: 12, color: '#6b7280' }}>Page {page} of {Math.max(1, Math.ceil(total/limit))}</span>
-                <button disabled={page>=Math.ceil(total/limit)} onClick={()=>setPage(p=>p+1)} style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid #e5e7eb', background: '#fff', cursor: page>=Math.ceil(total/limit)?'not-allowed':'pointer' }}>Next</button>
-              </div>
-            </div>
-          )}
-        </Card>
+                <div>
+                  <button type="submit" style={{ background: '#111827', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 14px', cursor: 'pointer' }}>Submit</button>
+                </div>
+              </form>
+            </Card>
 
-        <Card title="Announcements">
-          <ul>
-            <li>View latest community notices</li>
-          </ul>
-        </Card>
-
-        <Card title="Payments">
-          <ul>
-            <li>View dues and payment history</li>
-          </ul>
-        </Card>
-
-        <Card title="Documents Repository" style={{ gridColumn: '1 / -1' }}>
-          {uiMessage && (
-            <div style={{ marginBottom: 8, padding: '8px 12px', borderRadius: 8, fontSize: 14, background: uiMessage.type==='success'?'#d1fae5':uiMessage.type==='error'?'#fee2e2':'#dbeafe', color: uiMessage.type==='success'?'#065f46':uiMessage.type==='error'?'#991b1b':'#1e40af' }}>
-              {uiMessage.message}
-            </div>
-          )}
-          <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
-            <input
-              type="text"
-              value={filters.search}
-              onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-              placeholder="Search documents..."
-              style={{ flex: 1, padding: 8, border: '1px solid #e5e7eb', borderRadius: 6, minWidth: 200 }}
-            />
-            <select
-              value={filters.category}
-              onChange={(e) => setFilters({ ...filters, category: e.target.value })}
-              style={{ padding: 8, border: '1px solid #e5e7eb', borderRadius: 6 }}
-            >
-              <option value="all">All Categories</option>
-              {documentCategories.map(cat => (
-                <option key={cat} value={cat}>{cat}</option>
-              ))}
-            </select>
-            <button 
-              onClick={fetchDocuments} 
-              style={{ padding: '8px 12px', borderRadius: 6, border: '1px solid #e5e7eb', background: '#fff', cursor: 'pointer' }}
-            >
-              Apply
-            </button>
-          </div>
-          {loadingDocs ? (
-            <div>Loading documents...</div>
-          ) : documents.length === 0 ? (
-            <div style={{ color: '#6b7280', textAlign: 'center' }}>No documents available</div>
-          ) : (
-            <div style={{ display: 'grid', gap: 12 }}>
-              {documents.map(doc => (
-                <div key={doc._id} style={{ border: '1px solid #e5e7eb', borderRadius: 8, padding: 12, background: '#fafafa' }}>
-                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-                    <span style={{ fontSize: 24 }}>{getFileIcon(doc.fileType)}</span>
-                    <div style={{ flex: 1 }}>
-                      <h4 style={{ margin: 0, fontSize: 14 }}>{doc.title}</h4>
-                      {doc.description && (
-                        <p style={{ margin: '4px 0 0 0', fontSize: 13, color: '#6b7280' }}>{doc.description}</p>
-                      )}
+            <Card title="My Complaints">
+              {loading ? (
+                <div>Loading...</div>
+              ) : myComplaints.length === 0 ? (
+                <div style={{ color: '#6b7280' }}>No complaints yet</div>
+              ) : (
+                <div style={{ display: 'grid', gap: 8 }}>
+                  {myComplaints.map(c => (
+                    <div key={c._id} style={{ border: '1px solid #e5e7eb', borderRadius: 8, padding: 12, background: '#fafafa' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                        <strong>{c.title}</strong>
+                        <span style={{ fontSize: 12, color: '#6b7280' }}>{new Date(c.created_at).toLocaleString('en-IN')}</span>
+                      </div>
+                      <div style={{ fontSize: 13, color: '#6b7280', marginTop: 4 }}>{c.description}</div>
                       <div style={{ display: 'flex', gap: 8, marginTop: 6, fontSize: 12 }}>
-                        <span style={{ background: '#f3f4f6', padding: '2px 6px', borderRadius: 4 }}>{doc.category}</span>
-                        <span style={{ color: '#6b7280' }}>{formatFileSize(doc.fileSize)}</span>
+                        <span style={{ background: '#f3f4f6', padding: '2px 6px', borderRadius: 6 }}>{c.category}</span>
+                        <span style={{ background: '#eef2ff', color: '#3730a3', padding: '2px 6px', borderRadius: 6 }}>{c.priority.toUpperCase()}</span>
+                        <span style={{ background: '#ecfeff', color: '#155e75', padding: '2px 6px', borderRadius: 6 }}>{c.status.replace('_',' ').toUpperCase()}</span>
                       </div>
                     </div>
-                  </div>
-                  <div style={{ marginTop: 8 }}>
-                    <button
-                      onClick={() => handleDownloadDocument(doc._id, doc.fileName)}
-                      style={{ 
-                        background: '#111827', 
-                        color: '#fff', 
-                        border: 'none', 
-                        borderRadius: 6, 
-                        padding: '6px 12px', 
-                        cursor: 'pointer',
-                        fontSize: 12 
-                      }}
-                    >
-                      Download PDF
-                    </button>
+                  ))}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
+                    <button disabled={page<=1} onClick={()=>setPage(p=>Math.max(1,p-1))} style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid #e5e7eb', background: '#fff', cursor: page<=1?'not-allowed':'pointer' }}>Prev</button>
+                    <span style={{ fontSize: 12, color: '#6b7280' }}>Page {page} of {Math.max(1, Math.ceil(total/limit))}</span>
+                    <button disabled={page>=Math.ceil(total/limit)} onClick={()=>setPage(p=>p+1)} style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid #e5e7eb', background: '#fff', cursor: page>=Math.ceil(total/limit)?'not-allowed':'pointer' }}>Next</button>
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
-        </Card>
-      </main>
-    </div>
+              )}
+            </Card>
+
+            <Card title="Announcements">
+              <ul>
+                <li>View latest community notices</li>
+              </ul>
+            </Card>
+
+            <Card title="Payments">
+              <ul>
+                <li>View dues and payment history</li>
+              </ul>
+            </Card>
+          </main>
+        </div>
+      </div>
+    </>
   );
 }
 
