@@ -75,6 +75,702 @@ const AdminDashboard = () => {
     }
   };
 
+  // Staff & Vendors Management
+  const StaffContent = () => {
+    const [staffView, setStaffView] = useState('overview');
+    const [staff, setStaff] = useState([]);
+    const [vendors, setVendors] = useState([]);
+    const [attendance, setAttendance] = useState([]);
+    const [loading, setLoading] = useState(false);
+    const [staffSubmitting, setStaffSubmitting] = useState(false);
+    const [vendorSubmitting, setVendorSubmitting] = useState(false);
+    const [attendanceUpdating, setAttendanceUpdating] = useState(null); // staffId currently updating
+
+    const [staffForm, setStaffForm] = useState({
+      name: '',
+      email: '',
+      phone: '',
+      role: 'security',
+      department: 'security',
+      salary: '',
+      joiningDate: new Date().toISOString().split('T')[0],
+      address: '',
+      emergencyContact: '',
+      shift: 'morning'
+    });
+
+    const [vendorForm, setVendorForm] = useState({
+      companyName: '',
+      contactPerson: '',
+      phone: '',
+      email: '',
+      serviceType: 'cleaning',
+      contractStart: new Date().toISOString().split('T')[0],
+      contractEnd: '',
+      paymentTerms: 'monthly',
+      rate: '',
+      address: ''
+    });
+
+    const staffRoles = [
+      'security',
+      'housekeeping',
+      'maintenance',
+      'electrician',
+      'plumber',
+      'gardener',
+      'supervisor'
+    ];
+
+    const serviceTypes = [
+      'cleaning',
+      'security',
+      'maintenance',
+      'plumbing',
+      'electrical',
+      'carpentry',
+      'landscaping',
+      'waste_management'
+    ];
+
+    const shifts = ['morning', 'evening', 'night', 'general'];
+
+    useEffect(() => {
+      if (activeTab === 'staff') {
+        fetchStaffData();
+      }
+    }, [activeTab]);
+
+    const fetchStaffData = async () => {
+      setLoading(true);
+      try {
+        const [staffRes, vendorsRes, attendanceRes] = await Promise.all([
+          fetch('/api/staff', { credentials: 'include' }),
+          fetch('/api/vendors', { credentials: 'include' }),
+          fetch('/api/staff/attendance/today', { credentials: 'include' })
+        ]);
+
+        if (staffRes.ok) setStaff(await staffRes.json());
+        if (vendorsRes.ok) setVendors(await vendorsRes.json());
+        if (attendanceRes.ok) setAttendance(await attendanceRes.json());
+      } catch (err) {
+        setUiMessage({ type: 'error', message: 'Failed to fetch staff data' });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    const handleAddStaff = async (e) => {
+      e.preventDefault();
+      // basic validation
+      if (!staffForm.name || !staffForm.email || !staffForm.phone || !staffForm.role || !staffForm.department || !staffForm.salary || !staffForm.joiningDate) {
+        setUiMessage({ type: 'error', message: 'Please fill all required staff fields' });
+        return;
+      }
+      try {
+        setStaffSubmitting(true);
+        setUiMessage({ type: 'loading', message: 'Adding staff...' });
+        const res = await fetch('/api/staff', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(staffForm)
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.message || 'Failed to add staff');
+        setUiMessage({ type: 'success', message: 'Staff member added successfully' });
+        // reset form
+        setStaffForm({
+          name: '', email: '', phone: '', role: 'security', department: 'security', salary: '',
+          joiningDate: new Date().toISOString().split('T')[0], address: '', emergencyContact: '', shift: 'morning'
+        });
+        setStaffView('overview');
+        fetchStaffData();
+      } catch (err) {
+        setUiMessage({ type: 'error', message: err.message });
+      } finally {
+        setStaffSubmitting(false);
+      }
+    };
+
+    const handleAddVendor = async (e) => {
+      e.preventDefault();
+      // basic validation
+      if (!vendorForm.companyName || !vendorForm.contactPerson || !vendorForm.phone || !vendorForm.serviceType || !vendorForm.contractStart) {
+        setUiMessage({ type: 'error', message: 'Please fill all required vendor fields' });
+        return;
+      }
+      try {
+        setVendorSubmitting(true);
+        setUiMessage({ type: 'loading', message: 'Adding vendor...' });
+        const res = await fetch('/api/vendors', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(vendorForm)
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.message || 'Failed to add vendor');
+        setUiMessage({ type: 'success', message: 'Vendor added successfully' });
+        // reset and return to overview
+        setVendorForm({
+          companyName: '', contactPerson: '', phone: '', email: '', serviceType: 'cleaning',
+          contractStart: new Date().toISOString().split('T')[0], contractEnd: '', paymentTerms: 'monthly', rate: '', address: ''
+        });
+        setStaffView('overview');
+        fetchStaffData();
+      } catch (err) {
+        setUiMessage({ type: 'error', message: err.message });
+      } finally {
+        setVendorSubmitting(false);
+      }
+    };
+
+    const markAttendance = async (staffId, status) => {
+      try {
+        setAttendanceUpdating(staffId);
+        const res = await fetch('/api/staff/attendance', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ staffId, status })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.message || 'Failed to update attendance');
+        setUiMessage({ type: 'success', message: 'Attendance updated' });
+        fetchStaffData();
+      } catch (err) {
+        setUiMessage({ type: 'error', message: err.message });
+      } finally {
+        setAttendanceUpdating(null);
+      }
+    };
+
+    const generateSalarySlip = async (staffId, month) => {
+      // TODO: Implement salary slip generation API call
+    };
+
+    return (
+      <div className="content-section">
+        <div className="section-header">
+          <h2>Staff & Vendors Management</h2>
+          <div style={{ display: 'flex', gap: 12 }}>
+            <button className="secondary-btn" onClick={() => setStaffView('add-staff')}>
+              <UserCog size={18} />
+              Add Staff
+            </button>
+            <button className="secondary-btn" onClick={() => setStaffView('add-vendor')}>
+              <Users size={18} />
+              Add Vendor
+            </button>
+          </div>
+        </div>
+
+        {staffView === 'overview' && (
+          <>
+            <div className="stats-grid">
+              <StatsCard icon={Users} title="Total Staff" value={staff.length} color="#3b82f6" />
+              <StatsCard icon={UserCog} title="Present Today" value={attendance.filter(a => a.status === 'present').length} color="#10b981" />
+              <StatsCard icon={DollarSign} title="Active Vendors" value={vendors.filter(v => v.status === 'active').length} color="#f59e0b" />
+              <StatsCard icon={Calendar} title="Pending Salaries" value={staff.filter(s => !s.salaryPaid).length} color="#ef4444" />
+            </div>
+
+            <div className="table-container" style={{ marginBottom: 24 }}>
+              <div style={{ padding: '16px 20px', borderBottom: '1px solid #e2e8f0' }}>
+                <h3 style={{ margin: 0 }}>Staff Members</h3>
+              </div>
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Role</th>
+                    <th>Department</th>
+                    <th>Shift</th>
+                    <th>Contact</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {staff.map(employee => (
+                    <tr key={employee._id}>
+                      <td>
+                        <div className="user-cell">
+                          <div className="user-avatar">{employee.name?.charAt(0)}</div>
+                          <span>{employee.name}</span>
+                        </div>
+                      </td>
+                      <td>{employee.role}</td>
+                      <td>{employee.department}</td>
+                      <td>{employee.shift}</td>
+                      <td>{employee.phone}</td>
+                      <td>
+                        <span className={`status-badge ${employee.isActive ? 'active' : 'inactive'}`}>
+                          {employee.isActive ? 'Active' : 'Inactive'}
+                        </span>
+                      </td>
+                      <td>
+                        <div className="action-buttons">
+                          <button className="btn-save">Edit</button>
+                          <button className="btn-toggle">{employee.isActive ? 'Deactivate' : 'Activate'}</button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="table-container">
+              <div style={{ padding: '16px 20px', borderBottom: '1px solid #e2e8f0' }}>
+                <h3 style={{ margin: 0 }}>Today's Attendance</h3>
+              </div>
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Staff Name</th>
+                    <th>Shift</th>
+                    <th>Check-in</th>
+                    <th>Check-out</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {attendance.map(record => (
+                    <tr key={record._id}>
+                      <td>{record.staffName}</td>
+                      <td>{record.shift}</td>
+                      <td>{record.checkIn || '--:--'}</td>
+                      <td>{record.checkOut || '--:--'}</td>
+                      <td>
+                        <span className={`status-badge ${
+                          record.status === 'present' ? 'active' :
+                          record.status === 'absent' ? 'inactive' : 'pending'
+                        }`}>
+                          {record.status.toUpperCase()}
+                        </span>
+                      </td>
+                      <td>
+                        <div className="action-buttons">
+                          <button className="btn-save" disabled={attendanceUpdating===record.staffId} onClick={() => markAttendance(record.staffId, 'present')}>Mark Present</button>
+                          <button className="btn-toggle" disabled={attendanceUpdating===record.staffId} onClick={() => markAttendance(record.staffId, 'absent')}>Mark Absent</button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+
+        {staffView === 'add-staff' && (
+          <div className="form-card">
+            <div className="section-header" style={{ marginBottom: 24 }}>
+              <h3 style={{ margin: 0 }}>Add New Staff Member</h3>
+              <button className="secondary-btn" onClick={() => setStaffView('overview')}>Back to Overview</button>
+            </div>
+            <form onSubmit={handleAddStaff}>
+              <div className="form-grid">
+                <div className="form-group">
+                  <label>Full Name *</label>
+                  <input value={staffForm.name} onChange={e => setStaffForm({ ...staffForm, name: e.target.value })} required />
+                </div>
+                <div className="form-group">
+                  <label>Email *</label>
+                  <input type="email" value={staffForm.email} onChange={e => setStaffForm({ ...staffForm, email: e.target.value })} required />
+                </div>
+                <div className="form-group">
+                  <label>Phone *</label>
+                  <input value={staffForm.phone} onChange={e => setStaffForm({ ...staffForm, phone: e.target.value })} required />
+                </div>
+                <div className="form-group">
+                  <label>Role *</label>
+                  <select value={staffForm.role} onChange={e => setStaffForm({ ...staffForm, role: e.target.value })} required>
+                    {staffRoles.map(role => (<option key={role} value={role}>{role}</option>))}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Department *</label>
+                  <select value={staffForm.department} onChange={e => setStaffForm({ ...staffForm, department: e.target.value })} required>
+                    <option value="security">Security</option>
+                    <option value="housekeeping">Housekeeping</option>
+                    <option value="maintenance">Maintenance</option>
+                    <option value="administration">Administration</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Shift *</label>
+                  <select value={staffForm.shift} onChange={e => setStaffForm({ ...staffForm, shift: e.target.value })} required>
+                    {shifts.map(s => (<option key={s} value={s}>{s}</option>))}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Monthly Salary *</label>
+                  <input type="number" value={staffForm.salary} onChange={e => setStaffForm({ ...staffForm, salary: e.target.value })} required />
+                </div>
+                <div className="form-group">
+                  <label>Joining Date *</label>
+                  <input type="date" value={staffForm.joiningDate} onChange={e => setStaffForm({ ...staffForm, joiningDate: e.target.value })} required />
+                </div>
+              </div>
+              <div className="form-group">
+                <label>Address</label>
+                <textarea rows="3" value={staffForm.address} onChange={e => setStaffForm({ ...staffForm, address: e.target.value })} />
+              </div>
+              <div className="form-group">
+                <label>Emergency Contact</label>
+                <input value={staffForm.emergencyContact} onChange={e => setStaffForm({ ...staffForm, emergencyContact: e.target.value })} />
+              </div>
+              <button type="submit" className="primary-btn" disabled={staffSubmitting}>
+                {staffSubmitting ? 'Adding...' : 'Add Staff Member'}
+              </button>
+            </form>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // Security Management
+  const SecurityContent = () => {
+    const [securityView, setSecurityView] = useState('overview');
+    const [visitors, setVisitors] = useState([]);
+    const [incidents, setIncidents] = useState([]);
+    const [patrolLogs, setPatrolLogs] = useState([]);
+    const [loading, setLoading] = useState(false);
+
+    const [visitorForm, setVisitorForm] = useState({
+      name: '',
+      phone: '',
+      purpose: 'personal',
+      visitingUnit: '',
+      hostName: '',
+      expectedDuration: 2,
+      idProof: '',
+      idNumber: ''
+    });
+
+    const [incidentForm, setIncidentForm] = useState({
+      type: 'theft',
+      severity: 'medium',
+      description: '',
+      location: '',
+      reportedBy: '',
+      actionsTaken: ''
+    });
+
+    const visitorPurposes = ['personal', 'delivery', 'service', 'contractor', 'guest'];
+    const incidentTypes = ['theft', 'vandalism', 'unauthorized_entry', 'suspicious_activity', 'fire', 'medical', 'other'];
+
+    useEffect(() => {
+      if (activeTab === 'security') {
+        fetchSecurityData();
+      }
+    }, [activeTab]);
+
+    const fetchSecurityData = async () => {
+      setLoading(true);
+      try {
+        const [visitorsRes, incidentsRes, patrolRes] = await Promise.all([
+          fetch('/api/security/visitors/today', { credentials: 'include' }),
+          fetch('/api/security/incidents', { credentials: 'include' }),
+          fetch('/api/security/patrol-logs/today', { credentials: 'include' })
+        ]);
+
+        if (visitorsRes.ok) setVisitors(await visitorsRes.json());
+        if (incidentsRes.ok) setIncidents(await incidentsRes.json());
+        if (patrolRes.ok) setPatrolLogs(await patrolRes.json());
+      } catch (err) {
+        setUiMessage({ type: 'error', message: 'Failed to fetch security data' });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    const handleVisitorCheckIn = async (e) => {
+      e.preventDefault();
+      if (!visitorForm.name || !visitorForm.phone || !visitorForm.purpose || !visitorForm.visitingUnit || !visitorForm.hostName) {
+        setUiMessage({ type: 'error', message: 'Please fill all required visitor fields' });
+        return;
+      }
+      try {
+        setVisitorSubmitting(true);
+        setUiMessage({ type: 'loading', message: 'Checking in visitor...' });
+        const res = await fetch('/api/security/visitors/checkin', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(visitorForm)
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.message || 'Failed to check-in visitor');
+        setUiMessage({ type: 'success', message: 'Visitor checked in' });
+        setVisitorForm({ name: '', phone: '', purpose: 'personal', visitingUnit: '', hostName: '', expectedDuration: 2, idProof: '', idNumber: '' });
+        setSecurityView('overview');
+        fetchSecurityData();
+      } catch (err) {
+        setUiMessage({ type: 'error', message: err.message });
+      } finally {
+        setVisitorSubmitting(false);
+      }
+    };
+
+    const handleIncidentReport = async (e) => {
+      e.preventDefault();
+      if (!incidentForm.type || !incidentForm.severity || !incidentForm.description || !incidentForm.location) {
+        setUiMessage({ type: 'error', message: 'Please fill all required incident fields' });
+        return;
+      }
+      try {
+        setIncidentSubmitting(true);
+        setUiMessage({ type: 'loading', message: 'Reporting incident...' });
+        const res = await fetch('/api/security/incidents', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(incidentForm)
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.message || 'Failed to report incident');
+        setUiMessage({ type: 'success', message: 'Incident reported' });
+        setIncidentForm({ type: 'theft', severity: 'medium', description: '', location: '', reportedBy: '', actionsTaken: '' });
+        setSecurityView('overview');
+        fetchSecurityData();
+      } catch (err) {
+        setUiMessage({ type: 'error', message: err.message });
+      } finally {
+        setIncidentSubmitting(false);
+      }
+    };
+
+    const markVisitorExit = async (visitorId) => {
+      try {
+        setCheckoutProcessing(visitorId);
+        const res = await fetch(`/api/security/visitors/${visitorId}/checkout`, {
+          method: 'PATCH',
+          credentials: 'include'
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.message || 'Failed to check-out visitor');
+        setUiMessage({ type: 'success', message: 'Visitor checked out' });
+        fetchSecurityData();
+      } catch (err) {
+        setUiMessage({ type: 'error', message: err.message });
+      } finally {
+        setCheckoutProcessing(null);
+      }
+    };
+
+    const addPatrolLog = async (location, observations) => {
+      if (!location || !observations) {
+        setUiMessage({ type: 'error', message: 'Location and observations are required' });
+        return;
+      }
+      try {
+        setPatrolSubmitting(true);
+        const res = await fetch('/api/security/patrol-logs', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ location, observations })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.message || 'Failed to add patrol log');
+        setUiMessage({ type: 'success', message: 'Patrol log added' });
+        fetchSecurityData();
+      } catch (err) {
+        setUiMessage({ type: 'error', message: err.message });
+      } finally {
+        setPatrolSubmitting(false);
+      }
+    };
+
+    return (
+      <div className="content-section">
+        <div className="section-header">
+          <h2>Security Management</h2>
+          <div style={{ display: 'flex', gap: 12 }}>
+            <button className="secondary-btn" onClick={() => setSecurityView('visitor-checkin')}>
+              <UserCog size={18} />
+              Visitor Check-in
+            </button>
+            <button className="secondary-btn" onClick={() => setSecurityView('report-incident')}>
+              <Shield size={18} />
+              Report Incident
+            </button>
+          </div>
+        </div>
+
+        {securityView === 'overview' && (
+          <>
+            <div className="stats-grid">
+              <StatsCard icon={Users} title="Visitors Today" value={visitors.length} color="#3b82f6" />
+              <StatsCard icon={Shield} title="Active Incidents" value={incidents.filter(i => i.status === 'open').length} color="#ef4444" />
+              <StatsCard icon={FileText} title="Patrol Logs" value={patrolLogs.length} color="#10b981" />
+              <StatsCard icon={Bell} title="Pending Actions" value={incidents.filter(i => i.status === 'pending').length} color="#f59e0b" />
+            </div>
+
+            <div className="table-container" style={{ marginBottom: 24 }}>
+              <div style={{ padding: '16px 20px', borderBottom: '1px solid #e2e8f0' }}>
+                <h3 style={{ margin: 0 }}>Today's Visitors</h3>
+              </div>
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Visitor Name</th>
+                    <th>Contact</th>
+                    <th>Purpose</th>
+                    <th>Visiting Unit</th>
+                    <th>Check-in</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {visitors.map(visitor => (
+                    <tr key={visitor._id}>
+                      <td>{visitor.name}</td>
+                      <td>{visitor.phone}</td>
+                      <td>{visitor.purpose}</td>
+                      <td>{visitor.visitingUnit}</td>
+                      <td>{visitor.checkInTime ? new Date(visitor.checkInTime).toLocaleTimeString() : '--:--'}</td>
+                      <td>
+                        <span className={`status-badge ${!visitor.checkOutTime ? 'active' : 'inactive'}`}>
+                          {!visitor.checkOutTime ? 'IN' : 'OUT'}
+                        </span>
+                      </td>
+                      <td>
+                        <div className="action-buttons">
+                          {!visitor.checkOutTime && (
+                            <button className="btn-save" disabled={checkoutProcessing===visitor._id} onClick={() => markVisitorExit(visitor._id)}>
+                              Check-out
+                            </button>
+                          )}
+                          <button className="btn-toggle">Details</button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="table-container">
+              <div style={{ padding: '16px 20px', borderBottom: '1px solid #e2e8f0' }}>
+                <h3 style={{ margin: 0 }}>Recent Security Incidents</h3>
+              </div>
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Incident ID</th>
+                    <th>Type</th>
+                    <th>Severity</th>
+                    <th>Location</th>
+                    <th>Reported At</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {incidents.slice(0, 10).map(incident => (
+                    <tr key={incident._id}>
+                      <td>INC-{incident._id?.slice(-6)}</td>
+                      <td>{incident.type}</td>
+                      <td>
+                        <span className={`status-badge ${
+                          incident.severity === 'high' ? 'inactive' :
+                          incident.severity === 'medium' ? 'pending' : 'active'
+                        }`}>
+                          {incident.severity?.toUpperCase()}
+                        </span>
+                      </td>
+                      <td>{incident.location}</td>
+                      <td>{incident.reportedAt ? new Date(incident.reportedAt).toLocaleString() : ''}</td>
+                      <td>
+                        <span className={`status-badge ${
+                          incident.status === 'open' ? 'inactive' :
+                          incident.status === 'resolved' ? 'active' : 'pending'
+                        }`}>
+                          {incident.status?.toUpperCase()}
+                        </span>
+                      </td>
+                      <td>
+                        <div className="action-buttons">
+                          <button className="btn-save">View</button>
+                          <button className="btn-toggle">Update</button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+
+        {securityView === 'visitor-checkin' && (
+          <div className="form-card">
+            <div className="section-header" style={{ marginBottom: 24 }}>
+              <h3 style={{ margin: 0 }}>Visitor Check-in</h3>
+              <button className="secondary-btn" onClick={() => setSecurityView('overview')}>Back to Overview</button>
+            </div>
+            <form onSubmit={handleVisitorCheckIn}>
+              <div className="form-grid">
+                <div className="form-group">
+                  <label>Visitor Name *</label>
+                  <input value={visitorForm.name} onChange={e => setVisitorForm({ ...visitorForm, name: e.target.value })} required />
+                </div>
+                <div className="form-group">
+                  <label>Phone Number *</label>
+                  <input value={visitorForm.phone} onChange={e => setVisitorForm({ ...visitorForm, phone: e.target.value })} required />
+                </div>
+                <div className="form-group">
+                  <label>Purpose of Visit *</label>
+                  <select value={visitorForm.purpose} onChange={e => setVisitorForm({ ...visitorForm, purpose: e.target.value })} required>
+                    {visitorPurposes.map(p => (<option key={p} value={p}>{p}</option>))}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Visiting Unit *</label>
+                  <input value={visitorForm.visitingUnit} onChange={e => setVisitorForm({ ...visitorForm, visitingUnit: e.target.value })} required />
+                </div>
+                <div className="form-group">
+                  <label>Host Name *</label>
+                  <input value={visitorForm.hostName} onChange={e => setVisitorForm({ ...visitorForm, hostName: e.target.value })} required />
+                </div>
+                <div className="form-group">
+                  <label>Expected Duration (hours)</label>
+                  <input type="number" value={visitorForm.expectedDuration} onChange={e => setVisitorForm({ ...visitorForm, expectedDuration: e.target.value })} />
+                </div>
+              </div>
+              <div className="form-grid">
+                <div className="form-group">
+                  <label>ID Proof Type</label>
+                  <select value={visitorForm.idProof} onChange={e => setVisitorForm({ ...visitorForm, idProof: e.target.value })}>
+                    <option value="">Select ID Proof</option>
+                    <option value="aadhar">Aadhar Card</option>
+                    <option value="driving_license">Driving License</option>
+                    <option value="voter_id">Voter ID</option>
+                    <option value="passport">Passport</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>ID Number</label>
+                  <input value={visitorForm.idNumber} onChange={e => setVisitorForm({ ...visitorForm, idNumber: e.target.value })} />
+                </div>
+              </div>
+              <button type="submit" className="primary-btn" disabled={visitorSubmitting}>
+                {visitorSubmitting ? 'Checking in...' : 'Check-in Visitor'}
+              </button>
+            </form>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const handleLogout = async () => {
     try {
       await fetch('/api/users/logout', { method: 'POST', credentials: 'include' });
@@ -3528,8 +4224,8 @@ const AdminDashboard = () => {
             <PlaceholderContent title="Announcements" description="Create and manage community announcements" />
           )}
           {activeTab === 'documents' && <DocumentsContent />}
-          {activeTab === 'staff' && <PlaceholderContent title="Staff & Vendors" description="Manage staff attendance and vendor information" />}
-          {activeTab === 'security' && <PlaceholderContent title="Security Management" description="Monitor visitor logs and security activities" />}
+          {activeTab === 'staff' && <StaffContent />}
+          {activeTab === 'security' && <SecurityContent />}
         </div>
       </div>
     </>
