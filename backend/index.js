@@ -7,7 +7,7 @@ import userRoute from "./routes/user.route.js";
 import analyticsRoute from "./routes/analytics.route.js";
 import billingRoute from "./routes/billingRoutes.js"; // ✅ Add billing routes
 import amenityRoutes from './routes/amenityRoutes.js';
-
+import complaintsRoute from "./routes/complaints.route.js"; // ✅ Complaints API
 
 dotenv.config();
 
@@ -37,6 +37,7 @@ app.use("/api/users", userRoute);
 app.use("/api/analytics", analyticsRoute);
 app.use("/api/billing", billingRoute); // ✅ Billing API
 app.use('/api/amenities', amenityRoutes);
+app.use("/api/complaints", complaintsRoute); // ✅ Complaints API
 
 // Health check route
 app.get("/", (req, res) => {

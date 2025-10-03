@@ -32,9 +32,12 @@ export const adminCreateUser = async (req, res) => {
 };
 
 // Admin: List users
-export const listUsers = async (_req, res) => {
+export const listUsers = async (req, res) => {
   try {
-    const users = await User.find().select("-password").sort({ createdAt: -1 });
+    const { role } = req.query;
+    const filter = {};
+    if (role) filter.role = role;
+    const users = await User.find(filter).select("-password").sort({ createdAt: -1 });
     return res.status(200).json({ users });
   } catch (error) {
     console.error("List users error:", error);

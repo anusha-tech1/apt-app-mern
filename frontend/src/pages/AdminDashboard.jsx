@@ -1887,7 +1887,7 @@ const AdminDashboard = () => {
                           </div>
                         </td>
                       </tr>
-                    ))
+                    ))}
                   )}
                 </tbody>
               </table>
@@ -1898,17 +1898,286 @@ const AdminDashboard = () => {
     );
   };
 
-  // const PlaceholderContent = ({ title, description }) => (
-  //   <div className="content-section">
-  //     <h2>{title}</h2>
-  //     <div className="placeholder-content">
-  //       <MessageSquare size={48} style={{ color: '#9ca3af' }} />
-  //       <p>{description}</p>
-  //       <p className="text-muted">This module is under development</p>
-  //     </div>
-  //   </div>
-  // );
+  // Complaints & Maintenance
+  const ComplaintsContent = () => {
+    const [complaints, setComplaints] = useState([]);
+    const [loading, setLoading] = useState(false);
+    const [selectedComplaint, setSelectedComplaint] = useState(null);
+    const [filters, setFilters] = useState({ status: 'all', priority: 'all', category: 'all' });
+    const [staffMembers, setStaffMembers] = useState([]);
+    const [comments, setComments] = useState([]);
+    const [newComment, setNewComment] = useState('');
 
+    const complaintCategories = ['Plumbing','Electrical','Carpentry','Cleaning','Security','Parking','Elevator','Common Area','Noise','Other'];
+    const priorityOptions = [
+      { value: 'low', label: 'Low', color: '#10b981' },
+      { value: 'medium', label: 'Medium', color: '#f59e0b' },
+      { value: 'high', label: 'High', color: '#ef4444' },
+      { value: 'urgent', label: 'Urgent', color: '#dc2626' }
+    ];
+    const statusOptions = [
+      { value: 'pending', label: 'Pending', color: '#6b7280' },
+      { value: 'in_progress', label: 'In Progress', color: '#3b82f6' },
+      { value: 'resolved', label: 'Resolved', color: '#10b981' },
+      { value: 'closed', label: 'Closed', color: '#1f2937' }
+    ];
+
+    useEffect(() => { fetchComplaints(); fetchStaffMembers(); }, [filters]);
+
+    const fetchComplaints = async () => {
+      setLoading(true);
+      try {
+        const qp = new URLSearchParams();
+        if (filters.status !== 'all') qp.append('status', filters.status);
+        if (filters.priority !== 'all') qp.append('priority', filters.priority);
+        if (filters.category !== 'all') qp.append('category', filters.category);
+        const res = await fetch(`/api/complaints?${qp}`, { credentials: 'include' });
+        const data = await res.json();
+        if (res.ok) setComplaints(data.complaints || []); else setUiMessage({ type: 'error', message: data.error || 'Failed to fetch complaints' });
+      } catch (_) { setUiMessage({ type: 'error', message: 'Failed to fetch complaints' }); }
+      finally { setLoading(false); }
+    };
+
+    const fetchStaffMembers = async () => {
+      try {
+        const res = await fetch('/api/users?role=staff', { credentials: 'include' });
+        const data = await res.json();
+        if (res.ok) setStaffMembers(data.users || []);
+      } catch (_) {}
+    };
+
+    const fetchComplaintDetails = async (id) => {
+      try {
+        const [cr, rr] = await Promise.all([
+          fetch(`/api/complaints/${id}`, { credentials: 'include' }),
+          fetch(`/api/complaints/${id}/comments`, { credentials: 'include' })
+        ]);
+        const cd = await cr.json();
+        const cm = await rr.json();
+        if (cr.ok) { setSelectedComplaint(cd.complaint); setComments(cm.comments || []); }
+      } catch (_) { setUiMessage({ type: 'error', message: 'Failed to fetch complaint details' }); }
+    };
+
+    const updateComplaintStatus = async (id, status, notes = '') => {
+      try {
+        const res = await fetch(`/api/complaints/${id}/status`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ status, resolution_notes: notes }) });
+        const data = await res.json();
+        if (res.ok) { setUiMessage({ type: 'success', message: 'Complaint status updated successfully' }); fetchComplaints(); if (selectedComplaint && selectedComplaint._id === id) setSelectedComplaint(data.complaint); }
+        else throw new Error(data.error || 'Failed to update status');
+      } catch (err) { setUiMessage({ type: 'error', message: err.message }); }
+    };
+
+    const assignToStaff = async (id, staffId) => {
+      try {
+        const res = await fetch(`/api/complaints/${id}/assign`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ staff_id: staffId }) });
+        const data = await res.json();
+        if (res.ok) { setUiMessage({ type: 'success', message: 'Complaint assigned successfully' }); fetchComplaints(); if (selectedComplaint && selectedComplaint._id === id) setSelectedComplaint(data.complaint); }
+        else throw new Error(data.error || 'Failed to assign complaint');
+      } catch (err) { setUiMessage({ type: 'error', message: err.message }); }
+    };
+
+    const addComment = async (id) => {
+      if (!newComment.trim()) return;
+      try {
+        const res = await fetch(`/api/complaints/${id}/comments`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ comment: newComment }) });
+        const data = await res.json();
+        if (res.ok) { setComments(prev => [...prev, data.comment]); setNewComment(''); setUiMessage({ type: 'success', message: 'Comment added successfully' }); }
+        else throw new Error(data.error || 'Failed to add comment');
+      } catch (err) { setUiMessage({ type: 'error', message: err.message }); }
+    };
+
+    const getStatusColor = (s) => statusOptions.find(x => x.value === s)?.color || '#6b7280';
+    const getPriorityColor = (p) => priorityOptions.find(x => x.value === p)?.color || '#6b7280';
+
+    const ComplaintCard = ({ complaint }) => (
+      <div className="complaint-card" onClick={() => fetchComplaintDetails(complaint._id)} style={{ cursor: 'pointer' }}>
+        <div className="complaint-header">
+          <div className="complaint-title">
+            <h4>{complaint.title}</h4>
+            <div className="complaint-meta">
+              <span className="unit-badge">Unit {complaint.unit_number}</span>
+              <span className="category-badge">{complaint.category}</span>
+            </div>
+          </div>
+          <div className="complaint-status">
+            <span className="status-badge" style={{ backgroundColor: `${getStatusColor(complaint.status)}15`, color: getStatusColor(complaint.status) }}>
+              {statusOptions.find(s => s.value === complaint.status)?.label || complaint.status}
+            </span>
+            <span className="priority-badge" style={{ backgroundColor: `${getPriorityColor(complaint.priority)}15`, color: getPriorityColor(complaint.priority) }}>
+              {priorityOptions.find(p => p.value === complaint.priority)?.label || complaint.priority}
+            </span>
+          </div>
+        </div>
+        <div className="complaint-body"><p className="complaint-description">{complaint.description}</p></div>
+        <div className="complaint-footer">
+          <div className="complaint-info">
+            <span className="resident-name">By: {complaint.resident_name}</span>
+            <span className="complaint-date">{new Date(complaint.created_at).toLocaleDateString('en-IN')}</span>
+          </div>
+          {complaint.assigned_staff_id && (<span className="assigned-staff">Assigned</span>)}
+        </div>
+      </div>
+    );
+
+    const ComplaintDetailModal = () => {
+      if (!selectedComplaint) return null;
+      return (
+        <div className="modal-overlay" onClick={() => setSelectedComplaint(null)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>{selectedComplaint.title}</h3>
+              <button className="close-btn" onClick={() => setSelectedComplaint(null)}>×</button>
+            </div>
+            <div className="modal-body">
+              <div className="complaint-detail-grid">
+                <div className="detail-section">
+                  <h4>Complaint Details</h4>
+                  <div className="detail-item"><label>Resident:</label><span>{selectedComplaint.resident_name} (Unit {selectedComplaint.unit_number})</span></div>
+                  <div className="detail-item"><label>Category:</label><span>{selectedComplaint.category}</span></div>
+                  <div className="detail-item"><label>Priority:</label><span style={{ color: getPriorityColor(selectedComplaint.priority) }}>{priorityOptions.find(p => p.value === selectedComplaint.priority)?.label}</span></div>
+                  <div className="detail-item"><label>Status:</label><span style={{ color: getStatusColor(selectedComplaint.status) }}>{statusOptions.find(s => s.value === selectedComplaint.status)?.label}</span></div>
+                  <div className="detail-item"><label>Description:</label><p className="description-text">{selectedComplaint.description}</p></div>
+                </div>
+                <div className="action-section">
+                  <h4>Actions</h4>
+                  <div className="form-group">
+                    <label>Update Status</label>
+                    <select value={selectedComplaint.status} onChange={(e) => updateComplaintStatus(selectedComplaint._id, e.target.value)} className="status-select">
+                      {statusOptions.map(s => (<option key={s.value} value={s.value}>{s.label}</option>))}
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label>Assign to Staff</label>
+                    <select value={selectedComplaint.assigned_staff_id || ''} onChange={(e) => assignToStaff(selectedComplaint._id, e.target.value)} className="staff-select">
+                      <option value="">Select Staff</option>
+                      {staffMembers.map(staff => (<option key={staff._id} value={staff._id}>{staff.name}</option>))}
+                    </select>
+                  </div>
+                  {selectedComplaint.status === 'resolved' && (
+                    <div className="form-group">
+                      <label>Resolution Notes</label>
+                      <textarea
+                        value={selectedComplaint.resolution_notes || ''}
+                        onChange={(e) => setSelectedComplaint(prev => ({ ...prev, resolution_notes: e.target.value }))}
+                        placeholder="Add resolution notes..."
+                        rows="3"
+                        onBlur={() => updateComplaintStatus(selectedComplaint._id, selectedComplaint.status, selectedComplaint.resolution_notes)}
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="comments-section">
+                <h4>Comments & Updates</h4>
+                <div className="comments-list">
+                  {comments.map(c => (
+                    <div key={c._id} className="comment-item">
+                      <div className="comment-header">
+                        <span className="commenter">{c.commenter_name}</span>
+                        <span className="comment-date">{new Date(c.created_at).toLocaleString('en-IN')}</span>
+                      </div>
+                      <p className="comment-text">{c.comment}</p>
+                    </div>
+                  ))}
+                  {comments.length === 0 && (<p className="no-comments">No comments yet</p>)}
+                </div>
+                <div className="add-comment">
+                  <textarea value={newComment} onChange={(e) => setNewComment(e.target.value)} placeholder="Add a comment or update..." rows="3" />
+                  <button onClick={() => addComment(selectedComplaint._id)} className="primary-btn" disabled={!newComment.trim()}>Add Comment</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    return (
+      <div className="content-section">
+        <div className="section-header">
+          <h2>Complaints & Maintenance</h2>
+          <button className="primary-btn" onClick={fetchComplaints}><Wrench size={18} />Refresh</button>
+        </div>
+        {uiMessage && (<div className={`message ${uiMessage.type}`}>{uiMessage.message}</div>)}
+        <div className="filters-section">
+          <div className="filter-group"><label>Status:</label>
+            <select value={filters.status} onChange={(e) => setFilters(p => ({ ...p, status: e.target.value }))}>
+              <option value="all">All Status</option>
+              {statusOptions.map(s => (<option key={s.value} value={s.value}>{s.label}</option>))}
+            </select>
+          </div>
+          <div className="filter-group"><label>Priority:</label>
+            <select value={filters.priority} onChange={(e) => setFilters(p => ({ ...p, priority: e.target.value }))}>
+              <option value="all">All Priority</option>
+              {priorityOptions.map(p => (<option key={p.value} value={p.value}>{p.label}</option>))}
+            </select>
+          </div>
+          <div className="filter-group"><label>Category:</label>
+            <select value={filters.category} onChange={(e) => setFilters(p => ({ ...p, category: e.target.value }))}>
+              <option value="all">All Categories</option>
+              {complaintCategories.map(c => (<option key={c} value={c}>{c}</option>))}
+            </select>
+          </div>
+        </div>
+        {loading ? (<div className="loading">Loading complaints...</div>) : (
+          <div className="complaints-grid">
+            {complaints.length === 0 ? (
+              <div className="no-complaints"><Wrench size={48} style={{ color: '#9ca3af', marginBottom: 16 }} /><h3>No complaints found</h3><p>No complaints match your current filters</p></div>
+            ) : (
+              complaints.map(complaint => (<ComplaintCard key={complaint._id} complaint={complaint} />))
+            )}
+          </div>
+        )}
+        <ComplaintDetailModal />
+        <style>{`
+          .filters-section { display: flex; gap: 16px; margin-bottom: 24px; padding: 20px; background: white; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+          .filter-group { display: flex; flex-direction: column; gap: 8px; }
+          .filter-group label { font-size: 14px; font-weight: 500; color: #374151; }
+          .filter-group select { padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 14px; }
+          .complaints-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(400px, 1fr)); gap: 16px; }
+          .complaint-card { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); transition: all 0.2s; border-left: 4px solid #3b82f6; }
+          .complaint-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+          .complaint-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
+          .complaint-title h4 { margin: 0 0 8px 0; font-size: 16px; color: #1f2937; }
+          .complaint-meta { display: flex; gap: 8px; }
+          .unit-badge, .category-badge { padding: 4px 8px; background: #f3f4f6; border-radius: 4px; font-size: 12px; color: #6b7280; }
+          .complaint-status { display: flex; flex-direction: column; gap: 4px; align-items: flex-end; }
+          .status-badge, .priority-badge { padding: 4px 8px; border-radius: 12px; font-size: 11px; font-weight: 500; }
+          .complaint-body { margin-bottom: 16px; }
+          .complaint-description { font-size: 14px; color: #6b7280; line-height: 1.5; margin: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+          .complaint-footer { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: #9ca3af; }
+          .complaint-info { display: flex; gap: 12px; }
+          .assigned-staff { padding: 4px 8px; background: #dbeafe; color: #1e40af; border-radius: 4px; font-size: 11px; }
+          .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 20px; }
+          .modal-content { background: white; border-radius: 12px; width: 90%; max-width: 800px; max-height: 90vh; overflow-y: auto; }
+          .modal-header { display: flex; justify-content: space-between; align-items: center; padding: 24px; border-bottom: 1px solid #e2e8f0; }
+          .modal-header h3 { margin: 0; color: #1f2937; }
+          .close-btn { background: none; border: none; font-size: 24px; cursor: pointer; color: #6b7280; }
+          .modal-body { padding: 24px; }
+          .complaint-detail-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 24px; margin-bottom: 32px; }
+          .detail-section, .action-section { background: #f8fafc; padding: 20px; border-radius: 8px; }
+          .detail-section h4, .action-section h4 { margin: 0 0 16px 0; color: #374151; }
+          .detail-item { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
+          .detail-item label { font-size: 12px; font-weight: 500; color: #6b7280; text-transform: uppercase; }
+          .description-text { background: white; padding: 12px; border-radius: 6px; border: 1px solid #e2e8f0; margin: 0; }
+          .comments-section { border-top: 1px solid #e2e8f0; padding-top: 24px; }
+          .comments-section h4 { margin: 0 0 16px 0; }
+          .comments-list { max-height: 300px; overflow-y: auto; margin-bottom: 16px; }
+          .comment-item { background: #f8fafc; padding: 12px; border-radius: 8px; margin-bottom: 8px; }
+          .comment-header { display: flex; justify-content: space-between; margin-bottom: 4px; }
+          .commenter { font-weight: 500; color: #374151; }
+          .comment-date { font-size: 12px; color: #9ca3af; }
+          .comment-text { margin: 0; font-size: 14px; color: #6b7280; }
+          .no-comments { text-align: center; color: #9ca3af; font-style: italic; padding: 20px; }
+          .add-comment { display: flex; flex-direction: column; gap: 12px; }
+          .add-comment textarea { padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; resize: vertical; }
+          .no-complaints { text-align: center; padding: 60px 20px; color: #6b7280; }
+          .no-complaints h3 { margin: 0 0 8px 0; color: #374151; }
+          @media (max-width: 768px) { .filters-section { flex-direction: column; } .complaints-grid { grid-template-columns: 1fr; } .complaint-detail-grid { grid-template-columns: 1fr; } .modal-content { width: 95%; } }
+        `}</style>
+      </div>
+    );
+  };
   return (
     <>
       <style>{`
@@ -2404,8 +2673,11 @@ const AdminDashboard = () => {
           {activeTab === 'residents' && <ResidentsContent />}
           {activeTab === 'create-user' && <CreateUserContent />}
           {activeTab === 'billing' && <BillingContent />}
-          {activeTab === 'complaints' && <PlaceholderContent title="Complaints & Maintenance" description="Track and resolve resident complaints" />}
-          {activeTab === 'amenities' && <AmenitiesContent />}          {activeTab === 'announcements' && <PlaceholderContent title="Announcements" description="Create and manage community announcements" />}
+          {activeTab === 'complaints' && <ComplaintsContent />}
+          {activeTab === 'amenities' && <AmenitiesContent />}
+          {activeTab === 'announcements' && (
+            <PlaceholderContent title="Announcements" description="Create and manage community announcements" />
+          )}
           {activeTab === 'documents' && <PlaceholderContent title="Document Repository" description="Store and manage important documents" />}
           {activeTab === 'staff' && <PlaceholderContent title="Staff & Vendors" description="Manage staff attendance and vendor information" />}
           {activeTab === 'security' && <PlaceholderContent title="Security Management" description="Monitor visitor logs and security activities" />}
